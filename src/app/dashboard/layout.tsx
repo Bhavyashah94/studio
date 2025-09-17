@@ -20,8 +20,6 @@ import { Button } from '@/components/ui/button';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import Link from 'next/link';
 import { mockUser } from '@/lib/placeholder-data';
-import { Search } from 'lucide-react';
-import { Input } from '@/components/ui/input';
 
 export default function DashboardLayout({
   children,
@@ -43,16 +41,18 @@ export default function DashboardLayout({
         <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-6 sticky top-0 z-40">
           <SidebarTrigger className="md:hidden" />
           <div className="w-full flex-1">
-             {/* Can add breadcrumbs or page titles here */}
+            {/* Can add breadcrumbs or page titles here */}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={mockUser.avatarUrl} alt={mockUser.name} data-ai-hint="person portrait" />
-                  <AvatarFallback>
-                    {mockUser.name.charAt(0)}
-                  </AvatarFallback>
+                  <AvatarImage
+                    src={mockUser.avatarUrl}
+                    alt={mockUser.name}
+                    data-ai-hint="person portrait"
+                  />
+                  <AvatarFallback>{mockUser.name.charAt(0)}</AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
@@ -62,7 +62,7 @@ export default function DashboardLayout({
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuItem>Support</DropdownMenuItem>
               <DropdownMenuSeparator />
-               <DropdownMenuItem asChild>
+              <DropdownMenuItem asChild>
                 <Link href="/">Sign out</Link>
               </DropdownMenuItem>
             </DropdownMenuContent>
