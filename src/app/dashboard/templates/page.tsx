@@ -16,56 +16,90 @@ const contractCode = `
 pragma solidity ^0.8.20;
 
 /**
- * @title CertificateNFT
- * @dev A simple ERC721 based contract for issuing and managing verifiable certificates.
- * Each certificate is represented as a unique Non-Fungible Token (NFT).
+ * @title VeriCredCertificate
+ * @dev An ERC721-like contract for issuing and managing verifiable certificates.
+ * Implements Ownable for access control, allowing an owner to manage issuers.
  */
-contract CertificateNFT {
+contract VeriCredCertificate {
+    // --- State Variables ---
 
-    // State Variables
     string public name = "VeriCred Certificate";
     string public symbol = "VCRED";
-    address public owner; // The address that deployed the contract
+    address public owner;
 
     struct Certificate {
         string recipientName;
         string certificateTitle;
         uint256 issueDate;
-        string certificateHash; // IPFS hash or other unique identifier for the certificate data
+        string certificateHash; // IPFS hash or other unique identifier
         address issuer;
     }
 
-    // Mapping from token ID to Certificate details
+    // --- Mappings ---
+
     mapping(uint256 => Certificate) private _certificates;
-
-    // Mapping from token ID to owner address
     mapping(uint256 => address) private _owners;
-
-    // Mapping from owner to token count
     mapping(address => uint256) private _balances;
+    mapping(address => bool) public isIssuer; // Mapping to track approved issuers
 
-    // A counter for new certificate IDs
     uint256 private _nextTokenId;
 
-    // Events
+    // --- Events ---
+
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     event CertificateIssued(uint256 indexed tokenId, address indexed recipient, address indexed issuer, string certificateHash);
+    event IssuerAdded(address indexed account);
+    event IssuerRemoved(address indexed account);
 
-    // Modifier to ensure only the contract owner can call a function
+    // --- Modifiers ---
+
     modifier onlyOwner() {
-        require(msg.sender == owner, "Caller is not the owner");
+        require(msg.sender == owner, "Ownable: caller is not the owner");
         _;
     }
 
-    /**
-     * @dev Sets the contract deployer as the owner.
-     */
+    modifier onlyIssuer() {
+        require(isIssuer[msg.sender], "Caller is not an authorized issuer");
+        _;
+    }
+
+    // --- Constructor ---
+
     constructor() {
         owner = msg.sender;
+        // The contract deployer is automatically an issuer
+        isIssuer[msg.sender] = true;
+        emit IssuerAdded(msg.sender);
+    }
+
+    // --- Issuer Management Functions (Owner-only) ---
+
+    /**
+     * @dev Adds a new address to the list of authorized issuers.
+     * @param account The address to add.
+     */
+    function addIssuer(address account) public onlyOwner {
+        require(account != address(0), "Cannot add the zero address");
+        require(!isIssuer[account], "Account is already an issuer");
+        isIssuer[account] = true;
+        emit IssuerAdded(account);
     }
 
     /**
-     * @dev Issues a new certificate (mints a new NFT).
+     * @dev Removes an address from the list of authorized issuers.
+     * @param account The address to remove.
+     */
+    function removeIssuer(address account) public onlyOwner {
+        require(isIssuer[account], "Account is not an issuer");
+        isIssuer[account] = false;
+        emit IssuerRemoved(account);
+    }
+
+
+    // --- Certificate Functions ---
+
+    /**
+     * @dev Issues a new certificate. Can only be called by an authorized issuer.
      * @param recipient The address of the person receiving the certificate.
      * @param recipientName The name of the recipient.
      * @param certificateTitle The title of the certificate.
@@ -76,7 +110,7 @@ contract CertificateNFT {
         string memory recipientName,
         string memory certificateTitle,
         string memory certificateHash
-    ) public onlyOwner {
+    ) public onlyIssuer {
         require(recipient != address(0), "ERC721: mint to the zero address");
 
         uint256 tokenId = _nextTokenId++;
@@ -95,10 +129,10 @@ contract CertificateNFT {
         emit CertificateIssued(tokenId, recipient, msg.sender, certificateHash);
     }
 
+    // --- View Functions ---
+
     /**
      * @dev Returns the details of a specific certificate.
-     * @param tokenId The ID of the token.
-     * @return The certificate details struct.
      */
     function getCertificate(uint256 tokenId) public view returns (Certificate memory) {
         require(_exists(tokenId), "ERC721: query for nonexistent token");
@@ -151,9 +185,9 @@ export default function TemplatesPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Basic Certificate NFT</CardTitle>
+            <CardTitle>Role-Based Certificate NFT</CardTitle>
             <CardDescription>
-              A simple ERC721-like contract for issuing certificates as NFTs.
+              A robust contract with Owner and Issuer roles for access control.
             </CardDescription>
           </div>
           <Button variant="outline" size="icon" onClick={handleCopy}>
