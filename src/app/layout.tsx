@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { Web3ModalProvider } from '@/components/shared/web3-modal-provider';
 
 export const metadata: Metadata = {
   title: 'VeriCred',
@@ -27,7 +28,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {children}
+        <Web3ModalProvider>{children}</Web3ModalProvider>
         <Toaster />
       </body>
     </html>

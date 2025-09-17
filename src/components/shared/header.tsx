@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { Award } from 'lucide-react';
+import { ConnectWallet } from './connect-wallet';
 
 export function Header() {
   return (
@@ -10,9 +10,7 @@ export function Header() {
         <span className="ml-2 font-semibold font-headline">VeriCred</span>
       </Link>
       <nav className="ml-auto flex gap-4 sm:gap-6">
-        <Button asChild>
-          <Link href="/dashboard">Go to App</Link>
-        </Button>
+        <ConnectWallet />
       </nav>
     </header>
   );
