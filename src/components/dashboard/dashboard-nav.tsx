@@ -6,7 +6,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Award, Wallet, PlusCircle, Users } from 'lucide-react';
+import { Award, Wallet, PlusCircle, Users, FileCode } from 'lucide-react';
 
 const links = [
   { href: '/dashboard/wallet', label: 'My Wallet', icon: Wallet },
@@ -15,6 +15,11 @@ const links = [
     href: '/dashboard/manage-issuers',
     label: 'Manage Issuers',
     icon: Users,
+  },
+  {
+    href: '/dashboard/templates',
+    label: 'Templates',
+    icon: FileCode,
   },
 ];
 
