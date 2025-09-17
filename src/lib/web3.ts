@@ -6,12 +6,10 @@ import { cookieStorage, createStorage } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
 
 // Your WalletConnect Cloud project ID
-export const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID || 'YOUR_PROJECT_ID';
+export const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
 
-if (!projectId || projectId === 'YOUR_PROJECT_ID') {
-  console.warn(
-    'Warning: NEXT_PUBLIC_WC_PROJECT_ID is not set. Please set it in your .env.local file.'
-  );
+if (!projectId) {
+  throw new Error('NEXT_PUBLIC_WC_PROJECT_ID is not set');
 }
 
 const metadata = {
