@@ -1,3 +1,34 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "user-avatar",
+      "description": "User avatar",
+      "imageUrl": "https://picsum.photos/seed/avatar/40/40",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "issuer-logo-1",
+      "description": "Logo for University of Innovation",
+      "imageUrl": "https://picsum.photos/seed/logo1/40/40",
+      "imageHint": "university logo"
+    },
+    {
+      "id": "issuer-logo-2",
+      "description": "Logo for Tech Solutions Inc.",
+      "imageUrl": "https://picsum.photos/seed/logo2/40/40",
+      "imageHint": "tech logo"
+    },
+    {
+      "id": "issuer-logo-3",
+      "description": "Logo for Global Certifiers",
+      "imageUrl": "https://picsum.photos/seed/logo3/40/40",
+      "imageHint": "global logo"
+    },
+    {
+      "id": "cert-seal",
+      "description": "A golden seal for verified certificates",
+      "imageUrl": "https://picsum.photos/seed/seal/100/100",
+      "imageHint": "gold seal"
+    }
+  ]
 }
