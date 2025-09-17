@@ -32,9 +32,14 @@ export const config = defaultWagmiConfig({
   }),
 });
 
+// It's important to invoke this function on the client side.
 createWeb3Modal({
   wagmiConfig: config,
   projectId,
   enableAnalytics: true, // Optional - defaults to your Cloud configuration
   enableOnramp: true, // Optional - false as default
 });
+
+export function Web3Modal({ children }: { children: React.ReactNode }) {
+  return children;
+}
