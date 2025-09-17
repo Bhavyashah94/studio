@@ -63,7 +63,7 @@ export default function CertificatePage({ params }: { params: { id: string } }) 
               </div>
               <div className="bg-accent/10 p-8 flex flex-col items-center justify-center text-center">
                 <Badge variant="secondary" className="border-green-500/50 bg-green-100 text-green-800">
-                    <ShieldCheck className="mr-2 h-4 w-4 text-green-600"/> Verified on CertChain
+                    <ShieldCheck className="mr-2 h-4 w-4 text-green-600"/> Verified on VeriCred
                 </Badge>
                 {sealImage && (
                     <Image 

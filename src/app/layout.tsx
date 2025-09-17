@@ -3,7 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'CertChain',
+  title: 'VeriCred',
   description: 'Secure, verifiable digital certificates on the blockchain.',
 };
 

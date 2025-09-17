@@ -23,8 +23,8 @@ pragma solidity ^0.8.20;
 contract CertificateNFT {
 
     // State Variables
-    string public name = "CertChain Certificate";
-    string public symbol = "CERT";
+    string public name = "VeriCred Certificate";
+    string public symbol = "VCRED";
     address public owner; // The address that deployed the contract
 
     struct Certificate {

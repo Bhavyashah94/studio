@@ -33,7 +33,7 @@ export function DashboardNav() {
       >
         <Award className="h-6 w-6 text-accent" />
         <span className="duration-200 group-data-[collapsible=icon]:hidden">
-          CertChain
+          VeriCred
         </span>
       </Link>
       <SidebarMenu>

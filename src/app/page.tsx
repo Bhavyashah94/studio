@@ -19,7 +19,7 @@ export default function Home() {
                     The Future of Verifiable Credentials
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    CertChain provides a secure, decentralized platform for
+                    VeriCred provides a secure, decentralized platform for
                     issuing, managing, and verifying digital certificates on the
                     blockchain.
                   </p>
@@ -112,7 +112,7 @@ export default function Home() {
       </main>
       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
         <p className="text-xs text-muted-foreground">
-          &copy; 2024 CertChain. All rights reserved.
+          &copy; 2024 VeriCred. All rights reserved.
         </p>
       </footer>
     </div>
