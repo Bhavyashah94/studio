@@ -2,6 +2,7 @@ import { CertificateCard } from '@/components/dashboard/certificate-card';
 import { mockCertificates } from '@/lib/placeholder-data';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { Wallet } from 'lucide-react';
 
 export default function WalletPage() {
   return (
