@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { FileUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,6 +30,10 @@ const formSchema = z.object({
   certificateTitle: z.string().min(5, {
     message: 'Certificate title must be at least 5 characters.',
   }),
+  certificateFile: z
+    .any()
+    .refine((files) => files?.length === 1, 'Certificate PDF is required.')
+    .refine((files) => files?.[0]?.type === 'application/pdf', 'Only PDF files are allowed.'),
   credentialDetails: z.string().optional(),
 });
 
@@ -105,6 +110,34 @@ export default function IssueCertificatePage() {
                   </FormControl>
                   <FormDescription>
                     This is the main title that will appear on the certificate.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+             <FormField
+              control={form.control}
+              name="certificateFile"
+              render={({ field: { value, onChange, ...fieldProps } }) => (
+                <FormItem>
+                  <FormLabel>Certificate PDF</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <FileUp className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Input
+                        {...fieldProps}
+                        type="file"
+                        accept=".pdf"
+                        className="pl-10"
+                        onChange={(event) => {
+                          onChange(event.target.files);
+                        }}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>
+                    Upload the certificate document in PDF format.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
