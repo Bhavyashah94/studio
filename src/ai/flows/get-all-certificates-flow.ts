@@ -64,23 +64,30 @@ const getAllCertificatesFlow = ai.defineFlow(
   },
   async () => {
     try {
-      const issuedLogs = await viemClient.getLogs({
-        address: contractConfig.address,
-        event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
-        fromBlock: 'earliest',
-        toBlock: 'latest',
+      const [issuedLogs, revokedLogs] = await Promise.all([
+         viemClient.getLogs({
+            address: contractConfig.address,
+            event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
+            fromBlock: 'earliest',
+            toBlock: 'latest',
+        }),
+         viemClient.getLogs({
+            address: contractConfig.address,
+            event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
+            fromBlock: 'earliest',
+            toBlock: 'latest',
+        })
+      ]);
+      
+      const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
+      const certsByHolder = new Map<string, { cert: AllCertificateDetails, logIndex: number }[]>();
+
+      issuedLogs.forEach((log, index) => {
+          if(!log.args.holderId) return;
+          const holderCerts = certsByHolder.get(log.args.holderId) || [];
+          certsByHolder.set(log.args.holderId, [...holderCerts, { cert: {} as AllCertificateDetails, logIndex: index }]);
       });
       
-      const revokedLogs = await viemClient.getLogs({
-        address: contractConfig.address,
-        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
-        fromBlock: 'earliest',
-        toBlock: 'latest',
-      });
-
-      const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
-      const certsByHolder = new Map<string, AllCertificateDetails[]>();
-
       const certificatePromises = issuedLogs.map(async (log) => {
         const { issuer, holderId, metadataURI } = log.args;
         if (!issuer || !holderId || !metadataURI) return null;
@@ -91,10 +98,11 @@ const getAllCertificatesFlow = ai.defineFlow(
         ]);
         
         const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
-
-        const holderCerts = certsByHolder.get(holderId) || [];
-        const onChainIndex = holderCerts.length;
         
+        const holderCerts = certsByHolder.get(holderId) || [];
+        const onChainIndex = holderCerts.findIndex(c => c.logIndex === issuedLogs.indexOf(log));
+
+
         const certDetails: AllCertificateDetails = {
           issuerAddress: issuer,
           holderAddress: holderId,
@@ -109,13 +117,12 @@ const getAllCertificatesFlow = ai.defineFlow(
           onChainIndex: onChainIndex.toString(),
         };
 
-        certsByHolder.set(holderId, [...holderCerts, certDetails]);
         return certDetails;
       });
 
       const settledCertificates = (await Promise.all(certificatePromises)).filter((c): c is AllCertificateDetails => !!c);
 
-      // Sort by issuance (approximated by log order, as timestamp isn't in event)
+      // Sort by issuance date
       return settledCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
 
     } catch (error) {
