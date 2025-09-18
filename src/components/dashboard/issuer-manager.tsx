@@ -4,8 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { contractConfig } from '@/lib/web3';
 import { useToast } from '@/hooks/use-toast';
-import { viemClient } from '@/lib/viem-client';
-import { parseAbiItem } from 'viem';
+import { getIssuers } from '@/ai/flows/get-issuers-flow';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -29,7 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AddIssuerDialog } from './add-issuer-dialog';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
-type Issuer = {
+export type Issuer = {
   address: `0x${string}`;
   isActive: boolean;
 };
@@ -61,43 +60,12 @@ export function IssuerManager() {
     setIsLoading(true);
     setError(null);
     try {
-      const addedLogs = await viemClient.getLogs({
-        address: contractConfig.address,
-        event: parseAbiItem('event IssuerAdded(address indexed issuer)'),
-        fromBlock: 'earliest',
-        toBlock: 'latest',
-      });
-
-      const removedLogs = await viemClient.getLogs({
-        address: contractConfig.address,
-        event: parseAbiItem('event IssuerRemoved(address indexed issuer)'),
-        fromBlock: 'earliest',
-        toBlock: 'latest',
-      });
-
-      const issuerMap = new Map<`0x${string}`, boolean>();
-      
-      addedLogs.forEach(log => {
-        if (log.args.issuer) {
-            issuerMap.set(log.args.issuer, true);
-        }
-      });
-      
-      removedLogs.forEach(log => {
-        if (log.args.issuer) {
-            issuerMap.set(log.args.issuer, false);
-        }
-      });
-      
-      const issuerList = Array.from(issuerMap.entries()).map(([address, isActive]) => ({
-        address,
-        isActive,
-      }));
-
+      const issuerList = await getIssuers();
       setIssuers(issuerList);
     } catch (e) {
       console.error(e);
-      setError('Failed to fetch issuer data. Please try again.');
+      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+      setError(`Failed to fetch issuer data: ${errorMessage}. Please try again.`);
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +84,7 @@ export function IssuerManager() {
       fetchIssuers(); // Refresh the list
       setActioningAddress(null);
     }
-  }, [isConfirmed]);
+  }, [isConfirmed, toast]);
 
   const handleAddIssuer = (newIssuerAddress: `0x${string}`) => {
     setActioningAddress(newIssuerAddress);
