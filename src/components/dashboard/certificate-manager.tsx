@@ -87,7 +87,7 @@ export function CertificateManager() {
     if (isLoading) {
       return Array.from({ length: 3 }).map((_, i) => (
         <TableRow key={i}>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={6}>
             <Skeleton className="h-8 w-full" />
           </TableCell>
         </TableRow>
@@ -97,7 +97,7 @@ export function CertificateManager() {
     if (error) {
        return (
         <TableRow>
-          <TableCell colSpan={5}>
+          <TableCell colSpan={6}>
              <Alert variant="destructive">
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error.message}</AlertDescription>
@@ -110,7 +110,7 @@ export function CertificateManager() {
     if (!certificates || certificates.length === 0) {
       return (
         <TableRow>
-          <TableCell colSpan={5} className="text-center">No certificates found.</TableCell>
+          <TableCell colSpan={6} className="text-center">No certificates found.</TableCell>
         </TableRow>
       );
     }
@@ -118,6 +118,7 @@ export function CertificateManager() {
     return certificates.map((cert) => (
       <TableRow key={cert.transactionHash}>
         <TableCell>{cert.recipientName}</TableCell>
+        <TableCell className="font-mono text-xs">{cert.holderAddress}</TableCell>
         <TableCell className="font-medium">{cert.title}</TableCell>
         <TableCell className="font-mono text-xs">{cert.issuerAddress}</TableCell>
         <TableCell>
@@ -159,6 +160,7 @@ export function CertificateManager() {
         <TableHeader>
           <TableRow>
             <TableHead>Recipient</TableHead>
+            <TableHead>Holder ID</TableHead>
             <TableHead>Title</TableHead>
             <TableHead>Issuer</TableHead>
             <TableHead>Status</TableHead>
