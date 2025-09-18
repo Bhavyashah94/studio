@@ -103,8 +103,9 @@ const getAllCertificatesFlow = ai.defineFlow(
 
         const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
         
+        // Find the specific index of this certificate in the holder's list of issued certs
         const holderCerts = certsByHolder.get(holderId) || [];
-        const onChainIndex = holderCerts.indexOf(log);
+        const onChainIndex = holderCerts.findIndex(c => c.transactionHash === log.transactionHash);
 
 
         const certDetails: AllCertificateDetails = {
