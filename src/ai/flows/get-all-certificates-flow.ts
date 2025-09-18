@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { viemClient } from '@/lib/viem-client';
 import { contractConfig } from '@/lib/web3';
-import { parseAbiItem } from 'viem';
+import { decodeFunctionData, parseAbiItem } from 'viem';
 
 // Represents the full details of a certificate after fetching metadata and logs
 const AllCertificateDetailsSchema = z.object({
@@ -68,14 +68,14 @@ const getAllCertificatesFlow = ai.defineFlow(
       console.log('Starting to fetch certificate logs...');
       const fetchIssuedPromise = viemClient.getLogs({
         address: contractConfig.address,
-        event: parseAbiItem('event CertificateIssued(address indexed issuer, string holderId, string metadataURI)'),
+        event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
       
       const fetchRevokedPromise = viemClient.getLogs({
         address: contractConfig.address,
-        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string holderId, string metadataURI)'),
+        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
@@ -83,19 +83,26 @@ const getAllCertificatesFlow = ai.defineFlow(
       const [issuedLogs, revokedLogs] = await Promise.all([fetchIssuedPromise, fetchRevokedPromise]);
       console.log(`Fetched ${issuedLogs.length} issued logs and ${revokedLogs.length} revoked logs.`);
 
-      const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
-      const certsByHolder = new Map<string, any[]>();
-
-      // Group certificates by holder ID to correctly determine the on-chain index
-      issuedLogs.forEach(log => {
-          if(!log.args.holderId) return;
-          const holderCerts = certsByHolder.get(log.args.holderId) || [];
-          certsByHolder.set(log.args.holderId, [...holderCerts, log]);
-      });
+      const revokedSet = new Set(revokedLogs.map(log => log.transactionHash));
       
       const certificatePromises = issuedLogs.map(async (log) => {
-        const { issuer, holderId, metadataURI } = log.args;
-        if (!issuer || !holderId || !metadataURI) return null;
+        const { issuer, metadataURI } = log.args;
+        if (!issuer || !metadataURI || !log.transactionHash) return null;
+
+        // Fetch transaction to decode input and get the real holderAddress
+        const transaction = await viemClient.getTransaction({
+          hash: log.transactionHash,
+        });
+
+        if (!transaction) return null;
+        
+        const { args } = decodeFunctionData({
+          abi: contractConfig.abi,
+          data: transaction.input,
+        });
+        
+        const holderId = (args as any)?.[0] as string;
+        if (!holderId) return null;
 
         const metadataPromise = fetchFromIpfs(metadataURI);
         const blockPromise = viemClient.getBlock({ blockHash: log.blockHash });
@@ -104,16 +111,9 @@ const getAllCertificatesFlow = ai.defineFlow(
         
         if (!metadata || !block) return null;
 
-        const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
-        
-        // Find the specific index of this certificate in the holder's list of issued certs
-        const holderCerts = certsByHolder.get(holderId);
-        let onChainIndex = -1;
-        if(holderCerts) {
-            onChainIndex = holderCerts.findIndex(c => c.transactionHash === log.transactionHash);
-        }
+        const isRevoked = revokedSet.has(log.transactionHash);
 
-        const certDetails: AllCertificateDetails = {
+        return {
           issuerAddress: issuer,
           holderAddress: holderId,
           metadataURI: metadataURI,
@@ -124,17 +124,30 @@ const getAllCertificatesFlow = ai.defineFlow(
           issuerName: metadata?.name?.split(' - ')[0] || 'Unknown Issuer',
           recipientName: metadata?.recipient?.name || 'Unknown Recipient',
           transactionHash: log.transactionHash,
-          onChainIndex: onChainIndex.toString(),
+          onChainIndex: '0', // Placeholder, on-chain index logic needs re-evaluation
         };
-
-        return certDetails;
       });
 
-      const settledCertificates = (await Promise.all(certificatePromises)).filter((c): c is AllCertificateDetails => !!c);
-      console.log(`Successfully processed ${settledCertificates.length} certificates.`);
+      const allCertsUnfiltered = await Promise.all(certificatePromises);
+      const allCerts = allCertsUnfiltered.filter((c): c is AllCertificateDetails => c !== null);
+      
+      // Correctly calculate onChainIndex
+      const certsByHolder = new Map<string, AllCertificateDetails[]>();
+      allCerts.forEach(cert => {
+        const holderCerts = certsByHolder.get(cert.holderAddress) || [];
+        certsByHolder.set(cert.holderAddress, [...holderCerts, cert]);
+      });
+
+      const finalCerts = allCerts.map(cert => {
+        const holderCerts = certsByHolder.get(cert.holderAddress);
+        const onChainIndex = holderCerts ? holderCerts.findIndex(c => c.transactionHash === cert.transactionHash) : -1;
+        return { ...cert, onChainIndex: onChainIndex.toString() };
+      });
+      
+      console.log(`Successfully processed ${finalCerts.length} certificates.`);
 
       // Sort by issuance date
-      return settledCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+      return finalCerts.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
 
     } catch (error) {
       console.error("Error in getAllCertificatesFlow:", error);
