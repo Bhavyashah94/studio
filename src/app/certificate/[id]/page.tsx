@@ -8,8 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ShieldCheck, Download, Home } from 'lucide-react';
 
-export default function CertificatePage({ params }: { params: { id: string } }) {
-  const certificate = mockCertificates.find((c) => c.id === params.id);
+export default async function CertificatePage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const certificate = mockCertificates.find((c) => c.id === id);
   
   if (!certificate) {
     notFound();
