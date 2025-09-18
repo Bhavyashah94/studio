@@ -8,7 +8,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-import { Award, Wallet, PlusCircle, Users, FileCode } from 'lucide-react';
+import { Award, Wallet, PlusCircle, Users, FileCode, ShieldCheck } from 'lucide-react';
 
 const baseLinks = [
   { href: '/dashboard/wallet', label: 'My Wallet', icon: Wallet },
@@ -17,6 +17,7 @@ const baseLinks = [
 const issuerLinks = [
     ...baseLinks,
     { href: '/dashboard/issue', label: 'Issue Certificate', icon: PlusCircle },
+    { href: '/dashboard/manage-certificates', label: 'Manage Certificates', icon: ShieldCheck },
 ];
 
 const ownerLinks = [
