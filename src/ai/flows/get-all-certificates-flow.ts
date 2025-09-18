@@ -83,11 +83,13 @@ const getAllCertificatesFlow = ai.defineFlow(
       const [issuedLogs, revokedLogs] = await Promise.all([fetchIssuedPromise, fetchRevokedPromise]);
       console.log(`Fetched ${issuedLogs.length} issued logs and ${revokedLogs.length} revoked logs.`);
 
-      const revokedSet = new Set(revokedLogs.map(log => log.transactionHash));
+      const revokedSet = new Set(
+        revokedLogs.map(log => `${log.args.issuer}-${log.args.metadataURI}`)
+      );
       
       const certificatePromises = issuedLogs.map(async (log) => {
         const { issuer, metadataURI } = log.args;
-        if (!issuer || !metadataURI || !log.transactionHash) return null;
+        if (!issuer || !metadataURI || !log.transactionHash || !log.blockNumber) return null;
 
         // Fetch transaction to decode input and get the real holderAddress
         const transaction = await viemClient.getTransaction({
@@ -109,6 +111,7 @@ const getAllCertificatesFlow = ai.defineFlow(
             return null;
         }
         
+        // The holderId is the first argument of the issueCertificate function
         const holderId = (args as string[])?.[0];
         if (!holderId) {
             console.warn(`Could not decode holderId for transaction: ${log.transactionHash}`);
@@ -116,13 +119,13 @@ const getAllCertificatesFlow = ai.defineFlow(
         }
 
         const metadataPromise = fetchFromIpfs(metadataURI);
-        const blockPromise = viemClient.getBlock({ blockHash: log.blockHash });
+        const blockPromise = viemClient.getBlock({ blockNumber: log.blockNumber });
 
         const [metadata, block] = await Promise.all([metadataPromise, blockPromise]);
         
         if (!metadata || !block) return null;
-
-        const isRevoked = revokedSet.has(log.transactionHash);
+        
+        const isRevoked = revokedSet.has(`${issuer}-${metadataURI}`);
 
         return {
           issuerAddress: issuer,
