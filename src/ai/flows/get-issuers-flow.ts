@@ -31,20 +31,20 @@ const getIssuersFlow = ai.defineFlow(
     try {
       const latestBlock = await viemClient.getBlockNumber();
       // Query a smaller range to avoid RPC timeouts on free tiers
-      const fromBlock = latestBlock > 10000n ? latestBlock - 10000n : 0n;
+      const fromBlock = latestBlock > 10000n ? latestBlock - 9999n : 0n;
 
       const addedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerAdded(address indexed issuer)'),
         fromBlock: fromBlock,
-        toBlock: 'latest',
+        toBlock: latestBlock,
       });
 
       const removedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerRemoved(address indexed issuer)'),
         fromBlock: fromBlock,
-        toBlock: 'latest',
+        toBlock: latestBlock,
       });
 
       const [addedLogs, removedLogs] = await Promise.all([addedLogsPromise, removedLogsPromise]);
