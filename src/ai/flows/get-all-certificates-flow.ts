@@ -64,19 +64,21 @@ const getAllCertificatesFlow = ai.defineFlow(
   },
   async () => {
     try {
-      const issuedLogs = await viemClient.getLogs({
+      const fetchIssuedPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
       
-      const revokedLogs = await viemClient.getLogs({
+      const fetchRevokedPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
+      
+      const [issuedLogs, revokedLogs] = await Promise.all([fetchIssuedPromise, fetchRevokedPromise]);
 
       const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
       const certsByHolder = new Map<string, any[]>();
@@ -91,7 +93,11 @@ const getAllCertificatesFlow = ai.defineFlow(
         const { issuer, holderId, metadataURI } = log.args;
         if (!issuer || !holderId || !metadataURI) return null;
 
-        const metadata = await fetchFromIpfs(metadataURI);
+        const metadataPromise = fetchFromIpfs(metadataURI);
+        const blockPromise = viemClient.getBlock({ blockHash: log.blockHash });
+
+        const [metadata, block] = await Promise.all([metadataPromise, blockPromise]);
+
         const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
         
         const holderCerts = certsByHolder.get(holderId) || [];
@@ -102,7 +108,7 @@ const getAllCertificatesFlow = ai.defineFlow(
           issuerAddress: issuer,
           holderAddress: holderId,
           metadataURI: metadataURI,
-          issuedAt: new Date().toISOString(),
+          issuedAt: new Date(Number(block.timestamp) * 1000).toISOString(),
           revoked: isRevoked,
           title: metadata?.achievement?.title || 'Untitled Certificate',
           description: metadata?.description || 'No description provided.',
