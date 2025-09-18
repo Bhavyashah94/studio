@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -5,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useWriteContract } from 'wagmi';
 import { contractConfig } from '@/lib/web3';
+import { isAddress } from 'viem';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -34,6 +36,9 @@ const formSchema = z.object({
   recipientName: z.string().min(2, {
     message: 'Recipient name must be at least 2 characters.',
   }),
+  recipientAddress: z.string().refine((val) => isAddress(val), {
+    message: 'Please enter a valid Ethereum wallet address.',
+  }),
   recipientEmail: z.string().email({
     message: 'Please enter a valid email address.',
   }),
@@ -56,6 +61,7 @@ export default function IssueCertificatePage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       recipientName: '',
+      recipientAddress: '',
       recipientEmail: '',
       certificateTitle: '',
       certificateDescription: '',
@@ -80,11 +86,11 @@ export default function IssueCertificatePage() {
       const metadataURI = `ipfs://${pinataResponse.ipfsHash}`;
       toast({
         title: 'Metadata Uploaded!',
-        description: `Successfully pinned to IPFS: ${metadataURI}`,
+        description: `Successfully pinned to IPFS.`,
       });
 
       // 2. Issue certificate on the blockchain
-      const holderId = values.recipientName;
+      const holderId = values.recipientAddress;
       
       writeContract({
         ...contractConfig,
@@ -133,14 +139,27 @@ export default function IssueCertificatePage() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
             <div className="grid md:grid-cols-2 gap-8">
-              <FormField
+               <FormField
                 control={form.control}
                 name="recipientName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recipient Name (Holder ID)</FormLabel>
+                    <FormLabel>Recipient Name</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Alice Johnson" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="recipientAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Recipient Wallet Address (Holder ID)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="0x..." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -204,7 +223,7 @@ export default function IssueCertificatePage() {
             />
             <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPinning ? 'Uploading to IPFS...' : isContractPending ? 'Issuing...' : 'Issue Certificate'}
+              {isPinning ? 'Uploading to IPFS...' : isContractPending ? 'Issuing on-chain...' : 'Issue Certificate'}
             </Button>
           </form>
         </Form>
