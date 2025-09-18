@@ -4,13 +4,20 @@ import { createWeb3Modal } from '@web3modal/wagmi/react';
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config';
 import { cookieStorage, createStorage } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
+import CertificatePlatformAbi from './contracts/CertificatePlatform.json';
 
 // Your WalletConnect Cloud project ID
 export const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
+const contractAddress = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}` | undefined;
 
 if (!projectId) {
   throw new Error('NEXT_PUBLIC_WC_PROJECT_ID is not set');
 }
+
+if (!contractAddress) {
+  throw new Error('NEXT_PUBLIC_CONTRACT_ADDRESS is not set');
+}
+
 
 const metadata = {
   name: 'VeriCred',
@@ -37,6 +44,12 @@ createWeb3Modal({
   enableAnalytics: true, // Optional - defaults to your Cloud configuration
   enableOnramp: true, // Optional - false as default
 });
+
+export const contractConfig = {
+  address: contractAddress,
+  abi: CertificatePlatformAbi.abi,
+} as const;
+
 
 export function Web3Modal({ children }: { children: React.ReactNode }) {
   return children;

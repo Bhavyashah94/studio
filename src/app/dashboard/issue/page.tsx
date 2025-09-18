@@ -3,7 +3,8 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { FileUp } from 'lucide-react';
+import { useWriteContract } from 'wagmi';
+import { contractConfig } from '@/lib/web3';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -17,8 +18,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
   recipientName: z.string().min(2, {
@@ -30,39 +38,60 @@ const formSchema = z.object({
   certificateTitle: z.string().min(5, {
     message: 'Certificate title must be at least 5 characters.',
   }),
-  certificateFile: z
-    .any()
-    .refine((files) => files?.length === 1, 'Certificate PDF is required.')
-    .refine((files) => files?.[0]?.type === 'application/pdf', 'Only PDF files are allowed.'),
-  credentialDetails: z.string().optional(),
+  metadataURI: z.string().url({
+    message: 'Please enter a valid URL for the metadata.',
+  }),
 });
 
 export default function IssueCertificatePage() {
   const { toast } = useToast();
+  const { writeContract, isPending } = useWriteContract();
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       recipientName: '',
       recipientEmail: '',
       certificateTitle: '',
-      credentialDetails: '',
+      metadataURI: '',
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    console.log(values);
-    toast({
-      title: 'Certificate Issued!',
-      description: `Successfully issued "${values.certificateTitle}" to ${values.recipientName}.`,
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    // For the smart contract, we'll use recipientName as the holderId for now.
+    // In a real app, this might be a more unique identifier.
+    const holderId = values.recipientName;
+    
+    writeContract({
+      ...contractConfig,
+      functionName: 'issueCertificate',
+      args: [holderId, values.metadataURI],
+    }, {
+      onSuccess: () => {
+        toast({
+          title: 'Transaction Submitted!',
+          description: 'The certificate issuance is being processed on the blockchain.',
+        });
+        form.reset();
+      },
+      onError: (error) => {
+        toast({
+          variant: 'destructive',
+          title: 'Transaction Failed',
+          description: error.shortMessage || 'There was an error submitting the transaction.',
+        });
+      }
     });
-    form.reset();
   }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Issue a New Certificate</CardTitle>
-        <CardDescription>Fill in the details below to issue a new verifiable credential.</CardDescription>
+        <CardDescription>
+          Fill in the details below to issue a new verifiable credential on the
+          Sepolia testnet.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -73,7 +102,7 @@ export default function IssueCertificatePage() {
                 name="recipientName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Recipient Name</FormLabel>
+                    <FormLabel>Recipient Name (Holder ID)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Alice Johnson" {...field} />
                     </FormControl>
@@ -116,55 +145,30 @@ export default function IssueCertificatePage() {
               )}
             />
 
-             <FormField
-              control={form.control}
-              name="certificateFile"
-              render={({ field: { value, onChange, ...fieldProps } }) => (
-                <FormItem>
-                  <FormLabel>Certificate PDF</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                      <FileUp className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input
-                        {...fieldProps}
-                        type="file"
-                        accept=".pdf"
-                        className="pl-10"
-                        onChange={(event) => {
-                          onChange(event.target.files);
-                        }}
-                      />
-                    </div>
-                  </FormControl>
-                  <FormDescription>
-                    Upload the certificate document in PDF format.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <FormField
               control={form.control}
-              name="credentialDetails"
+              name="metadataURI"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Credential Details (Optional)</FormLabel>
+                  <FormLabel>Metadata URI</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Add any additional details or attributes about this credential..."
+                      placeholder="ipfs://bafkreihdwdcefgh4"
                       className="resize-none"
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    You can include JSON-LD or other structured data here.
+                    The URI pointing to the certificate's metadata (e.g., an IPFS link).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit">Issue Certificate</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isPending ? 'Issuing...' : 'Issue Certificate'}
+            </Button>
           </form>
         </Form>
       </CardContent>
