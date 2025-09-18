@@ -34,7 +34,7 @@ export function DashboardNav() {
     functionName: 'owner',
   });
 
-  const { data: isIssuer } = useReadContract({
+  const { data: isIssuerRole } = useReadContract({
     ...contractConfig,
     functionName: 'isIssuer',
     args: [address!],
@@ -44,6 +44,8 @@ export function DashboardNav() {
   });
 
   const isOwner = isConnected && owner === address;
+  const isIssuer = isIssuerRole || isOwner;
+
   const links = isOwner ? ownerLinks : isIssuer ? issuerLinks : baseLinks;
 
   return (

@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import Link from 'next/link';
 import { mockUser } from '@/lib/placeholder-data';
+import { UserRoleBadge } from '@/components/dashboard/user-role-badge';
 
 export default function DashboardLayout({
   children,
@@ -43,30 +44,33 @@ export default function DashboardLayout({
           <div className="w-full flex-1">
             {/* Can add breadcrumbs or page titles here */}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage
-                    src={mockUser.avatarUrl}
-                    alt={mockUser.name}
-                    data-ai-hint="person portrait"
-                  />
-                  <AvatarFallback>{mockUser.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Support</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/">Sign out</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-4">
+            <UserRoleBadge />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage
+                      src={mockUser.avatarUrl}
+                      alt={mockUser.name}
+                      data-ai-hint="person portrait"
+                    />
+                    <AvatarFallback>{mockUser.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuItem>Support</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/">Sign out</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
         <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-6">
           {children}
