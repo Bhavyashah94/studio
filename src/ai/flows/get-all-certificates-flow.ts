@@ -85,7 +85,11 @@ const getAllCertificatesFlow = ai.defineFlow(
         const { issuer, holderId, metadataURI } = log.args;
         if (!issuer || !holderId || !metadataURI) return null;
 
-        const metadata = await fetchFromIpfs(metadataURI);
+        const [metadata, block] = await Promise.all([
+          fetchFromIpfs(metadataURI),
+          log.blockNumber ? viemClient.getBlock({ blockNumber: log.blockNumber }) : Promise.resolve(null),
+        ]);
+        
         const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
 
         const holderCerts = certsByHolder.get(holderId) || [];
@@ -95,7 +99,7 @@ const getAllCertificatesFlow = ai.defineFlow(
           issuerAddress: issuer,
           holderAddress: holderId,
           metadataURI: metadataURI,
-          issuedAt: new Date().toISOString(), // This is not available in the event log, placeholder
+          issuedAt: block ? new Date(Number(block.timestamp) * 1000).toISOString() : new Date().toISOString(),
           revoked: isRevoked,
           title: metadata?.achievement?.title || 'Untitled Certificate',
           description: metadata?.description || 'No description provided.',
@@ -109,10 +113,10 @@ const getAllCertificatesFlow = ai.defineFlow(
         return certDetails;
       });
 
-      const settledCertificates = (await Promise.all(certificatePromises)).filter(Boolean);
+      const settledCertificates = (await Promise.all(certificatePromises)).filter((c): c is AllCertificateDetails => !!c);
 
       // Sort by issuance (approximated by log order, as timestamp isn't in event)
-      return settledCertificates.reverse();
+      return settledCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
 
     } catch (error) {
       console.error("Error fetching certificate logs:", error);
