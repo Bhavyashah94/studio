@@ -1,6 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useAccount, useReadContract } from 'wagmi';
+import { contractConfig } from '@/lib/web3';
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -8,23 +10,42 @@ import {
 } from '@/components/ui/sidebar';
 import { Award, Wallet, PlusCircle, Users, FileCode } from 'lucide-react';
 
-const links = [
+const baseLinks = [
   { href: '/dashboard/wallet', label: 'My Wallet', icon: Wallet },
-  { href: '/dashboard/issue', label: 'Issue Certificate', icon: PlusCircle },
-  {
-    href: '/dashboard/manage-issuers',
-    label: 'Manage Issuers',
-    icon: Users,
-  },
-  {
-    href: '/dashboard/templates',
-    label: 'Templates',
-    icon: FileCode,
-  },
 ];
+
+const issuerLinks = [
+    ...baseLinks,
+    { href: '/dashboard/issue', label: 'Issue Certificate', icon: PlusCircle },
+];
+
+const ownerLinks = [
+    ...issuerLinks,
+    { href: '/dashboard/manage-issuers', label: 'Manage Issuers', icon: Users },
+    { href: '/dashboard/templates', label: 'Templates', icon: FileCode },
+]
 
 export function DashboardNav() {
   const pathname = usePathname();
+  const { address, isConnected } = useAccount();
+
+  const { data: owner } = useReadContract({
+    ...contractConfig,
+    functionName: 'owner',
+  });
+
+  const { data: isIssuer } = useReadContract({
+    ...contractConfig,
+    functionName: 'isIssuer',
+    args: [address!],
+    query: {
+        enabled: isConnected,
+    }
+  });
+
+  const isOwner = isConnected && owner === address;
+  const links = isOwner ? ownerLinks : isIssuer ? issuerLinks : baseLinks;
+
   return (
     <div className="flex w-full flex-col gap-4">
       <Link
