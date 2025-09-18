@@ -75,6 +75,12 @@ const getCertificatesFlow = ai.defineFlow(
         args: [holderAddress],
       });
 
+      // If the holder has no certificates, the contract may return undefined or null.
+      // Handle this gracefully by returning an empty array.
+      if (!onChainData) {
+        return [];
+      }
+
       const certificatePromises = onChainData.map(async (cert) => {
         const metadata = await fetchFromIpfs(cert.metadataURI);
         
