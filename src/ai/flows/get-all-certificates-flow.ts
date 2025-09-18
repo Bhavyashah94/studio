@@ -64,50 +64,45 @@ const getAllCertificatesFlow = ai.defineFlow(
   },
   async () => {
     try {
-      const [issuedLogs, revokedLogs] = await Promise.all([
-         viemClient.getLogs({
-            address: contractConfig.address,
-            event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
-            fromBlock: 'earliest',
-            toBlock: 'latest',
-        }),
-         viemClient.getLogs({
-            address: contractConfig.address,
-            event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
-            fromBlock: 'earliest',
-            toBlock: 'latest',
-        })
-      ]);
+      const issuedLogs = await viemClient.getLogs({
+        address: contractConfig.address,
+        event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
+        fromBlock: 'earliest',
+        toBlock: 'latest',
+      });
       
-      const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
-      const certsByHolder = new Map<string, { cert: AllCertificateDetails, logIndex: number }[]>();
+      const revokedLogs = await viemClient.getLogs({
+        address: contractConfig.address,
+        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
+        fromBlock: 'earliest',
+        toBlock: 'latest',
+      });
 
-      issuedLogs.forEach((log, index) => {
+      const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
+      const certsByHolder = new Map<string, any[]>();
+
+      issuedLogs.forEach(log => {
           if(!log.args.holderId) return;
           const holderCerts = certsByHolder.get(log.args.holderId) || [];
-          certsByHolder.set(log.args.holderId, [...holderCerts, { cert: {} as AllCertificateDetails, logIndex: index }]);
+          certsByHolder.set(log.args.holderId, [...holderCerts, log]);
       });
       
       const certificatePromises = issuedLogs.map(async (log) => {
         const { issuer, holderId, metadataURI } = log.args;
         if (!issuer || !holderId || !metadataURI) return null;
 
-        const [metadata, block] = await Promise.all([
-          fetchFromIpfs(metadataURI),
-          log.blockNumber ? viemClient.getBlock({ blockNumber: log.blockNumber }) : Promise.resolve(null),
-        ]);
-        
+        const metadata = await fetchFromIpfs(metadataURI);
         const isRevoked = revokedSet.has(`${holderId}-${metadataURI}`);
         
         const holderCerts = certsByHolder.get(holderId) || [];
-        const onChainIndex = holderCerts.findIndex(c => c.logIndex === issuedLogs.indexOf(log));
+        const onChainIndex = holderCerts.indexOf(log);
 
 
         const certDetails: AllCertificateDetails = {
           issuerAddress: issuer,
           holderAddress: holderId,
           metadataURI: metadataURI,
-          issuedAt: block ? new Date(Number(block.timestamp) * 1000).toISOString() : new Date().toISOString(),
+          issuedAt: new Date().toISOString(),
           revoked: isRevoked,
           title: metadata?.achievement?.title || 'Untitled Certificate',
           description: metadata?.description || 'No description provided.',
