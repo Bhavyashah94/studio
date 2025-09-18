@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for fetching all certificate data from the blockchain.
@@ -67,14 +68,14 @@ const getAllCertificatesFlow = ai.defineFlow(
       console.log('Starting to fetch certificate logs...');
       const fetchIssuedPromise = viemClient.getLogs({
         address: contractConfig.address,
-        event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
+        event: parseAbiItem('event CertificateIssued(address indexed issuer, string holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
       
       const fetchRevokedPromise = viemClient.getLogs({
         address: contractConfig.address,
-        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI)'),
+        event: parseAbiItem('event CertificateRevoked(address indexed issuer, string holderId, string metadataURI)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });

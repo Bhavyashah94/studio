@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -43,8 +44,8 @@ contract CertificatePlatform is Ownable {
 
     event IssuerAdded(address indexed issuer);
     event IssuerRemoved(address indexed issuer);
-    event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI);
-    event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI);
+    event CertificateIssued(address indexed issuer, string holderId, string metadataURI);
+    event CertificateRevoked(address indexed issuer, string holderId, string metadataURI);
 
     /**
      * @dev Sets the contract deployer as the initial owner.
@@ -145,51 +146,4 @@ contract CertificatePlatform is Ownable {
         return issuers[account];
     }
 }
-`;
-
-export default function TemplatesPage() {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(contractCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="space-y-6">
-       <div>
-        <h1 className="text-2xl font-bold font-headline">Smart Contract Templates</h1>
-        <p className="text-muted-foreground mt-1">
-          Use these templates as a starting point for your on-chain logic.
-        </p>
-       </div>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Role-Based Certificate Platform</CardTitle>
-            <CardDescription>
-              A robust contract with Owner and Issuer roles for secure certificate management.
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="icon" onClick={handleCopy}>
-            {copied ? (
-              <Check className="h-4 w-4 text-green-500" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-            <span className="sr-only">Copy code</span>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="relative">
-            <pre className="bg-muted/50 p-4 rounded-md overflow-x-auto text-sm font-code">
-              <code>{contractCode.trim()}</code>
-            </pre>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+`
