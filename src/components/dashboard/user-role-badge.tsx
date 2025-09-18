@@ -10,6 +10,9 @@ export function UserRoleBadge() {
   const { data: owner, isLoading: isLoadingOwner } = useReadContract({
     ...contractConfig,
     functionName: 'owner',
+    query: {
+      enabled: isConnected,
+    }
   });
 
   const { data: isIssuerRole, isLoading: isLoadingIssuer } = useReadContract({
