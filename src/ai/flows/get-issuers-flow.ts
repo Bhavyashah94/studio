@@ -30,7 +30,8 @@ const getIssuersFlow = ai.defineFlow(
   async () => {
     try {
       const latestBlock = await viemClient.getBlockNumber();
-      const fromBlock = latestBlock > 100000n ? latestBlock - 100000n : 0n;
+      // Query a smaller range to avoid RPC timeouts on free tiers
+      const fromBlock = latestBlock > 10000n ? latestBlock - 10000n : 0n;
 
       const addedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
