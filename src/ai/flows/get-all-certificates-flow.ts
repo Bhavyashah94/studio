@@ -64,6 +64,7 @@ const getAllCertificatesFlow = ai.defineFlow(
   },
   async () => {
     try {
+      console.log('Starting to fetch certificate logs...');
       const fetchIssuedPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI)'),
@@ -79,10 +80,12 @@ const getAllCertificatesFlow = ai.defineFlow(
       });
       
       const [issuedLogs, revokedLogs] = await Promise.all([fetchIssuedPromise, fetchRevokedPromise]);
+      console.log(`Fetched ${issuedLogs.length} issued logs and ${revokedLogs.length} revoked logs.`);
 
       const revokedSet = new Set(revokedLogs.map(log => `${log.args.holderId}-${log.args.metadataURI}`));
       const certsByHolder = new Map<string, any[]>();
 
+      // Group certificates by holder ID to correctly determine the on-chain index
       issuedLogs.forEach(log => {
           if(!log.args.holderId) return;
           const holderCerts = certsByHolder.get(log.args.holderId) || [];
@@ -122,12 +125,13 @@ const getAllCertificatesFlow = ai.defineFlow(
       });
 
       const settledCertificates = (await Promise.all(certificatePromises)).filter((c): c is AllCertificateDetails => !!c);
+      console.log(`Successfully processed ${settledCertificates.length} certificates.`);
 
       // Sort by issuance date
       return settledCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
 
     } catch (error) {
-      console.error("Error fetching certificate logs:", error);
+      console.error("Error in getAllCertificatesFlow:", error);
       if (error instanceof Error) {
         throw new Error(`Failed to fetch certificate logs from blockchain: ${error.message}`);
       }
