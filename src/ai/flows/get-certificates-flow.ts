@@ -8,8 +8,7 @@
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { viemClient } from '@/lib/viem-client';
-import { contractConfig } from '@/lib/web3';
+import { getAllCertificates } from './get-all-certificates-flow';
 
 const GetCertificatesInputSchema = z.object({
   holderAddress: z.string().describe('The Ethereum address of the certificate holder.'),
@@ -33,28 +32,6 @@ export type CertificateDetails = z.infer<typeof CertificateDetailsSchema>;
 
 const GetCertificatesOutputSchema = z.array(CertificateDetailsSchema);
 
-// Helper to fetch JSON from an IPFS URI
-async function fetchFromIpfs(ipfsUri: string): Promise<any> {
-  if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
-    console.warn(`Invalid IPFS URI provided: ${ipfsUri}`);
-    return null;
-  }
-  const cid = ipfsUri.substring('ipfs://'.length);
-  // Using a public Pinata gateway
-  const url = `https://gateway.pinata.cloud/ipfs/${cid}`;
-
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch from IPFS gateway: ${response.statusText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error(`Error fetching metadata for CID ${cid}:`, error);
-    return null; // Return null to allow processing of other certificates
-  }
-}
-
 export async function getCertificates(
   input: GetCertificatesInput
 ): Promise<CertificateDetails[]> {
@@ -69,62 +46,23 @@ const getCertificatesFlow = ai.defineFlow(
   },
   async ({ holderAddress }) => {
     try {
-      const onChainData = await viemClient.readContract({
-        ...contractConfig,
-        functionName: 'getCertificates',
-        args: [String(holderAddress)], // Explicitly cast to string
-      });
+      // Fetch all certificates from the reliable event log flow
+      const allCertificates = await getAllCertificates();
 
-      // If the holder has no certificates, the contract may return undefined or null.
-      // Handle this gracefully by returning an empty array.
-      if (!onChainData) {
-        return [];
-      }
-
-      const certificatePromises = onChainData.map(async (cert) => {
-        const metadata = await fetchFromIpfs(cert.metadataURI);
-        
-        if (!metadata) {
-          // If metadata fails to load, create a placeholder object
-          return {
-            issuerAddress: cert.issuer,
-            holderAddress: cert.holderId,
-            metadataURI: cert.metadataURI,
-            issuedAt: new Date(Number(cert.issuedAt) * 1000).toISOString(),
-            revoked: cert.revoked,
-            title: 'Metadata Not Found',
-            description: `Could not load metadata from ${cert.metadataURI}`,
-            issuerName: 'Unknown Issuer',
-            recipientName: 'Unknown Recipient',
-          };
-        }
-        
-        return {
-          issuerAddress: cert.issuer,
-          holderAddress: cert.holderId,
-          metadataURI: cert.metadataURI,
-          issuedAt: new Date(Number(cert.issuedAt) * 1000).toISOString(),
-          revoked: cert.revoked,
-          title: metadata.achievement?.title || 'Untitled Certificate',
-          description: metadata.description || 'No description provided.',
-          issuerName: metadata.name?.split(' - ')[0] || 'Unknown Issuer',
-          recipientName: metadata.recipient?.name || 'Unknown Recipient',
-        };
-      });
-
-      const settledCertificates = await Promise.all(certificatePromises);
-
-      // Filter out any completely failed fetches if needed, though we return placeholders
-      const validCertificates = settledCertificates.filter(Boolean) as CertificateDetails[];
+      // Filter the certificates for the specific holder, comparing addresses case-insensitively
+      const userCertificates = allCertificates.filter(
+        (cert) => cert.holderAddress.toLowerCase() === holderAddress.toLowerCase()
+      );
       
-      return validCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
+      // Sort by issuance date
+      return userCertificates.sort((a,b) => new Date(b.issuedAt).getTime() - new Date(a.issuedAt).getTime());
 
     } catch (error) {
-      console.error('Error fetching on-chain certificate data:', error);
+      console.error('Error fetching and filtering certificate data:', error);
       if (error instanceof Error) {
-        throw new Error(`Failed to fetch certificates from blockchain: ${error.message}`);
+        throw new Error(`Failed to process certificates: ${error.message}`);
       }
-      throw new Error('An unknown error occurred while fetching certificates.');
+      throw new Error('An unknown error occurred while processing certificates.');
     }
   }
 );
