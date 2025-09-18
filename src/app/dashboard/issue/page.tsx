@@ -27,6 +27,8 @@ import {
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { pinCertificateData } from '@/ai/flows/pin-to-ipfs-flow';
+import { useState } from 'react';
 
 const formSchema = z.object({
   recipientName: z.string().min(2, {
@@ -38,14 +40,17 @@ const formSchema = z.object({
   certificateTitle: z.string().min(5, {
     message: 'Certificate title must be at least 5 characters.',
   }),
-  metadataURI: z.string().url({
-    message: 'Please enter a valid URL for the metadata.',
+  certificateDescription: z.string().min(10, {
+    message: 'Description must be at least 10 characters.',
   }),
 });
 
 export default function IssueCertificatePage() {
   const { toast } = useToast();
-  const { writeContract, isPending } = useWriteContract();
+  const { writeContract, isPending: isContractPending } = useWriteContract();
+  const [isPinning, setIsPinning] = useState(false);
+
+  const isPending = isContractPending || isPinning;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -53,35 +58,66 @@ export default function IssueCertificatePage() {
       recipientName: '',
       recipientEmail: '',
       certificateTitle: '',
-      metadataURI: '',
+      certificateDescription: '',
     },
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    // For the smart contract, we'll use recipientName as the holderId for now.
-    // In a real app, this might be a more unique identifier.
-    const holderId = values.recipientName;
-    
-    writeContract({
-      ...contractConfig,
-      functionName: 'issueCertificate',
-      args: [holderId, values.metadataURI],
-    }, {
-      onSuccess: () => {
-        toast({
-          title: 'Transaction Submitted!',
-          description: 'The certificate issuance is being processed on the blockchain.',
-        });
-        form.reset();
-      },
-      onError: (error) => {
-        toast({
-          variant: 'destructive',
-          title: 'Transaction Failed',
-          description: error.shortMessage || 'There was an error submitting the transaction.',
-        });
+    setIsPinning(true);
+    try {
+      // 1. Pin data to IPFS via our server flow
+      const pinataResponse = await pinCertificateData({
+        recipientName: values.recipientName,
+        recipientEmail: values.recipientEmail,
+        certificateTitle: values.certificateTitle,
+        certificateDescription: values.certificateDescription,
+      });
+
+      if (!pinataResponse.ipfsHash) {
+        throw new Error('Failed to pin data to IPFS');
       }
-    });
+
+      const metadataURI = `ipfs://${pinataResponse.ipfsHash}`;
+      toast({
+        title: 'Metadata Uploaded!',
+        description: `Successfully pinned to IPFS: ${metadataURI}`,
+      });
+
+      // 2. Issue certificate on the blockchain
+      const holderId = values.recipientName;
+      
+      writeContract({
+        ...contractConfig,
+        functionName: 'issueCertificate',
+        args: [holderId, metadataURI],
+      }, {
+        onSuccess: () => {
+          toast({
+            title: 'Transaction Submitted!',
+            description: 'The certificate issuance is being processed on the blockchain.',
+          });
+          form.reset();
+        },
+        onError: (error) => {
+          toast({
+            variant: 'destructive',
+            title: 'Transaction Failed',
+            description: error.shortMessage || 'There was an error submitting the transaction.',
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error(error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      toast({
+        variant: 'destructive',
+        title: 'Upload Failed',
+        description: errorMessage,
+      });
+    } finally {
+      setIsPinning(false);
+    }
   }
 
   return (
@@ -89,8 +125,8 @@ export default function IssueCertificatePage() {
       <CardHeader>
         <CardTitle>Issue a New Certificate</CardTitle>
         <CardDescription>
-          Fill in the details below to issue a new verifiable credential on the
-          Sepolia testnet.
+          Fill in the details below. The metadata will be uploaded to IPFS via Pinata,
+          and the certificate will be issued on the Sepolia testnet.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -147,19 +183,20 @@ export default function IssueCertificatePage() {
 
             <FormField
               control={form.control}
-              name="metadataURI"
+              name="certificateDescription"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Metadata URI</FormLabel>
+                  <FormLabel>Certificate Description</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="ipfs://bafkreihdwdcefgh4"
+                      placeholder="e.g. Completed a 12-week intensive course covering smart contract security, decentralized application architecture, and advanced cryptographic principles."
                       className="resize-none"
+                      rows={4}
                       {...field}
                     />
                   </FormControl>
                   <FormDescription>
-                    The URI pointing to the certificate's metadata (e.g., an IPFS link).
+                    A brief description of the achievement. This will be stored on IPFS.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -167,7 +204,7 @@ export default function IssueCertificatePage() {
             />
             <Button type="submit" disabled={isPending}>
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPending ? 'Issuing...' : 'Issue Certificate'}
+              {isPinning ? 'Uploading to IPFS...' : isContractPending ? 'Issuing...' : 'Issue Certificate'}
             </Button>
           </form>
         </Form>
