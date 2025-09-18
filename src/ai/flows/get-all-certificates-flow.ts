@@ -94,15 +94,26 @@ const getAllCertificatesFlow = ai.defineFlow(
           hash: log.transactionHash,
         });
 
-        if (!transaction) return null;
+        if (!transaction || !transaction.input) {
+            console.warn(`Could not find transaction or transaction input for hash: ${log.transactionHash}`);
+            return null;
+        }
         
-        const { args } = decodeFunctionData({
+        const { functionName, args } = decodeFunctionData({
           abi: contractConfig.abi,
           data: transaction.input,
         });
+
+        // Ensure we are decoding the correct function call
+        if (functionName !== 'issueCertificate') {
+            return null;
+        }
         
-        const holderId = (args as any)?.[0] as string;
-        if (!holderId) return null;
+        const holderId = (args as string[])?.[0];
+        if (!holderId) {
+            console.warn(`Could not decode holderId for transaction: ${log.transactionHash}`);
+            return null;
+        }
 
         const metadataPromise = fetchFromIpfs(metadataURI);
         const blockPromise = viemClient.getBlock({ blockHash: log.blockHash });
@@ -124,14 +135,14 @@ const getAllCertificatesFlow = ai.defineFlow(
           issuerName: metadata?.name?.split(' - ')[0] || 'Unknown Issuer',
           recipientName: metadata?.recipient?.name || 'Unknown Recipient',
           transactionHash: log.transactionHash,
-          onChainIndex: '0', // Placeholder, on-chain index logic needs re-evaluation
+          onChainIndex: '0', // Placeholder, will calculate below
         };
       });
 
       const allCertsUnfiltered = await Promise.all(certificatePromises);
       const allCerts = allCertsUnfiltered.filter((c): c is AllCertificateDetails => c !== null);
       
-      // Correctly calculate onChainIndex
+      // Correctly calculate onChainIndex by grouping certificates by holder
       const certsByHolder = new Map<string, AllCertificateDetails[]>();
       allCerts.forEach(cert => {
         const holderCerts = certsByHolder.get(cert.holderAddress) || [];
