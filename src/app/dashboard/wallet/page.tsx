@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useAccount } from 'wagmi';
@@ -5,23 +6,28 @@ import { CertificateCard } from '@/components/dashboard/certificate-card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Wallet, Loader2 } from 'lucide-react';
-import { getCertificates } from '@/ai/flows/get-certificates-flow';
+import { getAllCertificates } from '@/ai/flows/get-all-certificates-flow';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { AllCertificateDetails } from '@/ai/flows/get-all-certificates-flow';
 import type { CertificateDetails } from '@/ai/flows/get-certificates-flow';
 
 export default function WalletPage() {
   const { address, isConnected } = useAccount();
 
   const {
-    data: certificates,
+    data: allCertificates,
     isLoading,
     error,
-  } = useQuery<CertificateDetails[], Error>({
-    queryKey: ['certificates', address],
-    queryFn: () => getCertificates({ holderAddress: address! }),
-    enabled: !!address && isConnected,
+  } = useQuery<AllCertificateDetails[], Error>({
+    queryKey: ['allCertificates'],
+    queryFn: () => getAllCertificates(),
+    enabled: isConnected,
   });
+
+  const userCertificates = allCertificates?.filter(
+    (cert) => cert.holderAddress.toLowerCase() === address?.toLowerCase()
+  ) || [];
 
   const renderContent = () => {
     if (isLoading) {
@@ -49,7 +55,7 @@ export default function WalletPage() {
       )
     }
 
-    if (!certificates || certificates.length === 0) {
+    if (userCertificates.length === 0) {
       return (
         <div className="mt-16 flex flex-col items-center justify-center text-center">
           <div className="rounded-full bg-muted p-4">
@@ -66,8 +72,8 @@ export default function WalletPage() {
 
     return (
        <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {certificates.map((cert, index) => (
-            <CertificateCard key={`${cert.metadataURI}-${index}`} certificate={cert} />
+          {userCertificates.map((cert, index) => (
+            <CertificateCard key={`${cert.metadataURI}-${index}`} certificate={cert as CertificateDetails} />
           ))}
         </div>
     )
