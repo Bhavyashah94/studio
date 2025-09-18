@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow for fetching issuer data from the blockchain.
@@ -28,19 +29,21 @@ const getIssuersFlow = ai.defineFlow(
   },
   async () => {
     try {
-      const addedLogs = await viemClient.getLogs({
+      const addedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerAdded(address indexed issuer)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
 
-      const removedLogs = await viemClient.getLogs({
+      const removedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerRemoved(address indexed issuer)'),
         fromBlock: 'earliest',
         toBlock: 'latest',
       });
+
+      const [addedLogs, removedLogs] = await Promise.all([addedLogsPromise, removedLogsPromise]);
 
       const issuerMap = new Map<`0x${string}`, boolean>();
       
