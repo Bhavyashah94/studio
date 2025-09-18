@@ -1,26 +1,56 @@
+'use client';
+
+import { useAccount } from 'wagmi';
 import { CertificateCard } from '@/components/dashboard/certificate-card';
-import { mockCertificates } from '@/lib/placeholder-data';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Wallet } from 'lucide-react';
+import { Wallet, Loader2 } from 'lucide-react';
+import { getCertificates } from '@/ai/flows/get-certificates-flow';
+import { useQuery } from '@tanstack/react-query';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import type { CertificateDetails } from '@/ai/flows/get-certificates-flow';
 
 export default function WalletPage() {
-  return (
-    <div>
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold font-headline">My Certificate Wallet</h1>
-      </div>
-      <p className="text-muted-foreground mt-1">
-        Here are all the verifiable credentials you have received.
-      </p>
+  const { address, isConnected } = useAccount();
 
-      {mockCertificates.length > 0 ? (
-        <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockCertificates.map((cert) => (
-            <CertificateCard key={cert.id} certificate={cert} />
-          ))}
+  const {
+    data: certificates,
+    isLoading,
+    error,
+  } = useQuery<CertificateDetails[], Error>({
+    queryKey: ['certificates', address],
+    queryFn: () => getCertificates({ holderAddress: address! }),
+    enabled: !!address && isConnected,
+  });
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="mt-16 flex flex-col items-center justify-center text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+          <h2 className="mt-6 text-xl font-semibold">
+            Fetching your certificates...
+          </h2>
+          <p className="mt-2 max-w-sm text-muted-foreground">
+            This may take a moment.
+          </p>
         </div>
-      ) : (
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="mt-8">
+            <Alert variant="destructive">
+                <AlertTitle>Error Fetching Certificates</AlertTitle>
+                <AlertDescription>{error.message}</AlertDescription>
+            </Alert>
+        </div>
+      )
+    }
+
+    if (!certificates || certificates.length === 0) {
+      return (
         <div className="mt-16 flex flex-col items-center justify-center text-center">
           <div className="rounded-full bg-muted p-4">
             <Wallet className="h-12 w-12 text-muted-foreground" />
@@ -31,7 +61,30 @@ export default function WalletPage() {
             will appear here.
           </p>
         </div>
-      )}
+      );
+    }
+
+    return (
+       <div className="mt-6 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {certificates.map((cert, index) => (
+            <CertificateCard key={`${cert.metadataURI}-${index}`} certificate={cert} />
+          ))}
+        </div>
+    )
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold font-headline">
+          My Certificate Wallet
+        </h1>
+      </div>
+      <p className="text-muted-foreground mt-1">
+        Here are all the verifiable credentials you have received.
+      </p>
+
+      {renderContent()}
     </div>
   );
 }

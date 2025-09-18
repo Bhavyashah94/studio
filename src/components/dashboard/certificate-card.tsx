@@ -1,6 +1,5 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import type { Certificate } from '@/lib/placeholder-data';
 import {
   Card,
   CardContent,
@@ -10,34 +9,34 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Share2, Eye } from 'lucide-react';
+import { Share2, Eye, ShieldX } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import type { CertificateDetails } from '@/ai/flows/get-certificates-flow';
 
 type CertificateCardProps = {
-  certificate: Certificate;
+  certificate: CertificateDetails;
 };
 
 export function CertificateCard({ certificate }: CertificateCardProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="flex flex-row items-start gap-4">
-        <Image
-          src={certificate.issuerLogoUrl}
-          alt={`${certificate.issuer} logo`}
-          width={40}
-          height={40}
-          className="rounded-full border"
-          data-ai-hint="logo"
-        />
+        {/* We will add a placeholder for issuer logo later */}
         <div className="grid gap-1">
           <CardTitle className="text-base">{certificate.title}</CardTitle>
-          <CardDescription>Issued by {certificate.issuer}</CardDescription>
+          <CardDescription>Issued by {certificate.issuerName}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="flex-grow">
         <div className="text-sm text-muted-foreground">
-          Issued on: {new Date(certificate.date).toLocaleDateString()}
+          Issued on: {new Date(certificate.issuedAt).toLocaleDateString()}
         </div>
+         {certificate.revoked && (
+            <Badge variant="destructive" className="mt-2">
+              <ShieldX className="mr-2 h-4 w-4" />
+              Revoked
+            </Badge>
+          )}
       </CardContent>
       <CardFooter className="flex justify-between">
         <Button variant="outline" size="sm">
@@ -45,7 +44,8 @@ export function CertificateCard({ certificate }: CertificateCardProps) {
           Share
         </Button>
         <Button asChild size="sm">
-          <Link href={`/certificate/${certificate.id}`}>
+          {/* Update Link when public view page is ready */}
+          <Link href="#">
             <Eye className="mr-2 h-4 w-4" />
             View
           </Link>
