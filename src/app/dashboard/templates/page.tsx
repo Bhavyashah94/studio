@@ -15,151 +15,134 @@ const contractCode = `
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
- * @title VeriCredCertificate
- * @dev An ERC721-like contract for issuing and managing verifiable certificates.
- * Implements Ownable for access control, allowing an owner to manage issuers.
+ * @title CertificatePlatform
+ * @dev A contract for issuing and managing verifiable certificates with role-based access control.
+ * The contract owner can add/remove issuers. Authorized issuers can issue/revoke certificates.
  */
-contract VeriCredCertificate {
+contract CertificatePlatform is Ownable {
     // --- State Variables ---
 
-    string public name = "VeriCred Certificate";
-    string public symbol = "VCRED";
-    address public owner;
-
     struct Certificate {
-        string recipientName;
-        string certificateTitle;
-        uint256 issueDate;
-        string certificateHash; // IPFS hash or other unique identifier
         address issuer;
+        string holderId;      // An identifier for the certificate holder (e.g., student ID, employee ID)
+        string metadataURI;   // URI for certificate details (e.g., IPFS)
+        uint256 issuedAt;
+        bool revoked;
     }
 
-    // --- Mappings ---
+    // Mapping to track authorized issuer addresses
+    mapping(address => bool) public issuers;
 
-    mapping(uint256 => Certificate) private _certificates;
-    mapping(uint256 => address) private _owners;
-    mapping(address => uint256) private _balances;
-    mapping(address => bool) public isIssuer; // Mapping to track approved issuers
-
-    uint256 private _nextTokenId;
+    // Mapping from a holder's ID to their array of certificates
+    mapping(string => Certificate[]) private certificatesByHolder;
 
     // --- Events ---
 
-    event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
-    event CertificateIssued(uint256 indexed tokenId, address indexed recipient, address indexed issuer, string certificateHash);
-    event IssuerAdded(address indexed account);
-    event IssuerRemoved(address indexed account);
-
-    // --- Modifiers ---
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Ownable: caller is not the owner");
-        _;
-    }
-
-    modifier onlyIssuer() {
-        require(isIssuer[msg.sender], "Caller is not an authorized issuer");
-        _;
-    }
-
-    // --- Constructor ---
-
-    constructor() {
-        owner = msg.sender;
-        // The contract deployer is automatically an issuer
-        isIssuer[msg.sender] = true;
-        emit IssuerAdded(msg.sender);
-    }
-
-    // --- Issuer Management Functions (Owner-only) ---
+    event IssuerAdded(address indexed issuer);
+    event IssuerRemoved(address indexed issuer);
+    event CertificateIssued(address indexed issuer, string indexed holderId, string metadataURI);
+    event CertificateRevoked(address indexed issuer, string indexed holderId, string metadataURI);
 
     /**
-     * @dev Adds a new address to the list of authorized issuers.
-     * @param account The address to add.
+     * @dev Sets the contract deployer as the initial owner.
      */
-    function addIssuer(address account) public onlyOwner {
-        require(account != address(0), "Cannot add the zero address");
-        require(!isIssuer[account], "Account is already an issuer");
-        isIssuer[account] = true;
-        emit IssuerAdded(account);
+    constructor() Ownable(msg.sender) {}
+
+    // --- Owner Functions ---
+
+    /**
+     * @dev Allows the owner to authorize a new issuer.
+     * @param _issuer The address of the new issuer.
+     */
+    function addIssuer(address _issuer) external onlyOwner {
+        require(_issuer != address(0), "Cannot add the zero address");
+        issuers[_issuer] = true;
+        emit IssuerAdded(_issuer);
     }
 
     /**
-     * @dev Removes an address from the list of authorized issuers.
-     * @param account The address to remove.
+     * @dev Allows the owner to remove an issuer.
+     * @param _issuer The address of the issuer to remove.
      */
-    function removeIssuer(address account) public onlyOwner {
-        require(isIssuer[account], "Account is not an issuer");
-        isIssuer[account] = false;
-        emit IssuerRemoved(account);
+    function removeIssuer(address _issuer) external onlyOwner {
+        issuers[_issuer] = false;
+        emit IssuerRemoved(_issuer);
     }
 
-
-    // --- Certificate Functions ---
+    // --- Issuer Functions ---
 
     /**
-     * @dev Issues a new certificate. Can only be called by an authorized issuer.
-     * @param recipient The address of the person receiving the certificate.
-     * @param recipientName The name of the recipient.
-     * @param certificateTitle The title of the certificate.
-     * @param certificateHash A unique hash (e.g., IPFS CID) of the certificate details.
+     * @dev Allows an authorized issuer to issue a new certificate.
+     * @param holderId The unique identifier for the certificate recipient.
+     * @param metadataURI The URI pointing to the certificate's metadata.
      */
-    function issueCertificate(
-        address recipient,
-        string memory recipientName,
-        string memory certificateTitle,
-        string memory certificateHash
-    ) public onlyIssuer {
-        require(recipient != address(0), "ERC721: mint to the zero address");
+    function issueCertificate(string calldata holderId, string calldata metadataURI) external {
+        require(issuers[msg.sender], "Not an authorized issuer");
 
-        uint256 tokenId = _nextTokenId++;
-        _balances[recipient]++;
-        _owners[tokenId] = recipient;
-
-        _certificates[tokenId] = Certificate({
-            recipientName: recipientName,
-            certificateTitle: certificateTitle,
-            issueDate: block.timestamp,
-            certificateHash: certificateHash,
-            issuer: msg.sender
+        Certificate memory cert = Certificate({
+            issuer: msg.sender,
+            holderId: holderId,
+            metadataURI: metadataURI,
+            issuedAt: block.timestamp,
+            revoked: false
         });
 
-        emit Transfer(address(0), recipient, tokenId);
-        emit CertificateIssued(tokenId, recipient, msg.sender, certificateHash);
+        certificatesByHolder[holderId].push(cert);
+        emit CertificateIssued(msg.sender, holderId, metadataURI);
+    }
+
+    /**
+     * @dev Allows an issuer to revoke a certificate they previously issued.
+     * @param holderId The identifier of the holder whose certificate is being revoked.
+     * @param index The index of the certificate in the holder's array.
+     */
+    function revokeCertificate(string calldata holderId, uint256 index) external {
+        require(issuers[msg.sender], "Not an authorized issuer");
+        require(index < certificatesByHolder[holderId].length, "Invalid certificate index");
+        
+        Certificate storage cert = certificatesByHolder[holderId][index];
+        require(cert.issuer == msg.sender, "Only the original issuer can revoke this certificate");
+        require(!cert.revoked, "Certificate has already been revoked");
+
+        cert.revoked = true;
+        emit CertificateRevoked(msg.sender, holderId, cert.metadataURI);
     }
 
     // --- View Functions ---
 
     /**
-     * @dev Returns the details of a specific certificate.
+     * @dev Retrieves all certificates for a given holder ID.
+     * @param holderId The identifier of the holder.
+     * @return An array of Certificate structs.
      */
-    function getCertificate(uint256 tokenId) public view returns (Certificate memory) {
-        require(_exists(tokenId), "ERC721: query for nonexistent token");
-        return _certificates[tokenId];
+    function getCertificates(string calldata holderId) external view returns (Certificate[] memory) {
+        return certificatesByHolder[holderId];
     }
 
     /**
-     * @dev Returns the owner of the specified token ID.
+     * @dev Verifies a single certificate by its holder ID and index.
+     * @param holderId The identifier of the holder.
+     * @param index The index of the certificate in the holder's array.
+     * @return The Certificate struct.
      */
-    function ownerOf(uint256 tokenId) public view returns (address) {
-        address tokenOwner = _owners[tokenId];
-        require(tokenOwner != address(0), "ERC721: owner query for nonexistent token");
-        return tokenOwner;
+    function verifyCertificate(
+        string calldata holderId,
+        uint256 index
+    ) external view returns (Certificate memory) {
+        require(index < certificatesByHolder[holderId].length, "Invalid index");
+        return certificatesByHolder[holderId][index];
     }
 
     /**
-     * @dev Returns the number of tokens in an owner's account.
+     * @dev Checks if a given address is an authorized issuer.
+     * @param account The address to check.
+     * @return true if the address is an issuer, false otherwise.
      */
-    function balanceOf(address account) public view returns (uint256) {
-        return _balances[account];
-    }
-
-    /**
-     * @dev Internal function to check if a token exists.
-     */
-    function _exists(uint256 tokenId) internal view returns (bool) {
-        return _owners[tokenId] != address(0);
+    function isIssuer(address account) external view returns (bool) {
+        return issuers[account];
     }
 }
 `;
@@ -185,9 +168,9 @@ export default function TemplatesPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Role-Based Certificate NFT</CardTitle>
+            <CardTitle>Role-Based Certificate Platform</CardTitle>
             <CardDescription>
-              A robust contract with Owner and Issuer roles for access control.
+              A robust contract with Owner and Issuer roles for secure certificate management.
             </CardDescription>
           </div>
           <Button variant="outline" size="icon" onClick={handleCopy}>
