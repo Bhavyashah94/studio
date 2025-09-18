@@ -72,7 +72,7 @@ const getCertificatesFlow = ai.defineFlow(
       const onChainData = await viemClient.readContract({
         ...contractConfig,
         functionName: 'getCertificates',
-        args: [holderAddress],
+        args: [String(holderAddress)], // Explicitly cast to string
       });
 
       // If the holder has no certificates, the contract may return undefined or null.
