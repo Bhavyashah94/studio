@@ -29,17 +29,20 @@ const getIssuersFlow = ai.defineFlow(
   },
   async () => {
     try {
+      const latestBlock = await viemClient.getBlockNumber();
+      const fromBlock = latestBlock > 100000n ? latestBlock - 100000n : 0n;
+
       const addedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerAdded(address indexed issuer)'),
-        fromBlock: 'earliest',
+        fromBlock: fromBlock,
         toBlock: 'latest',
       });
 
       const removedLogsPromise = viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerRemoved(address indexed issuer)'),
-        fromBlock: 'earliest',
+        fromBlock: fromBlock,
         toBlock: 'latest',
       });
 
