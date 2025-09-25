@@ -1,9 +1,9 @@
-
 'use server';
 /**
- * @fileOverview A flow for fetching issuer data from the blockchain.
+ * @fileOverview A flow for fetching issuer data from the blockchain in correct chronological order.
  *
  * - getIssuers - Fetches and processes IssuerAdded and IssuerRemoved events.
+ *   Applies logs in block order to ensure the latest status is always correct.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,13 +13,20 @@ import { contractConfig } from '@/lib/web3';
 import { parseAbiItem } from 'viem';
 import type { Issuer } from '@/components/dashboard/issuer-manager';
 
-const GetIssuersOutputSchema = z.array(z.object({
-  address: z.string(),
-  isActive: z.boolean(),
-}));
+const GetIssuersOutputSchema = z.array(
+  z.object({
+    address: z.string(),
+    isActive: z.boolean(),
+  })
+);
 
 export async function getIssuers(): Promise<Issuer[]> {
-    return getIssuersFlow();
+  // Cast the address property to the correct type
+  const result = await getIssuersFlow();
+  return result.map((issuer) => ({
+    ...issuer,
+    address: issuer.address as `0x${string}`,
+  }));
 }
 
 const getIssuersFlow = ai.defineFlow(
@@ -30,48 +37,56 @@ const getIssuersFlow = ai.defineFlow(
   async () => {
     try {
       const latestBlock = await viemClient.getBlockNumber();
-      // Query a smaller range to avoid RPC timeouts on free tiers
-      const fromBlock = latestBlock > 10000n ? latestBlock - 9999n : 0n;
 
-      const addedLogsPromise = viemClient.getLogs({
+      // Limit scan to recent 10k blocks to avoid RPC timeout
+      const fromBlock = latestBlock > BigInt(10000) ? latestBlock - BigInt(9999) : BigInt(0);
+
+      // Fetch IssuerAdded logs
+      const addedLogs = await viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerAdded(address indexed issuer)'),
-        fromBlock: fromBlock,
+        fromBlock,
         toBlock: latestBlock,
       });
 
-      const removedLogsPromise = viemClient.getLogs({
+      // Fetch IssuerRemoved logs
+      const removedLogs = await viemClient.getLogs({
         address: contractConfig.address,
         event: parseAbiItem('event IssuerRemoved(address indexed issuer)'),
-        fromBlock: fromBlock,
+        fromBlock,
         toBlock: latestBlock,
       });
 
-      const [addedLogs, removedLogs] = await Promise.all([addedLogsPromise, removedLogsPromise]);
+      // Merge all logs
+      const allLogs = [
+        ...addedLogs.map((log) => ({ ...log, type: 'added' as const })),
+        ...removedLogs.map((log) => ({ ...log, type: 'removed' as const })),
+      ];
 
+      // Sort by blockNumber and logIndex to apply chronologically
+      allLogs.sort((a, b) => {
+        if (a.blockNumber !== b.blockNumber) return Number(a.blockNumber - b.blockNumber);
+        return Number(a.logIndex - b.logIndex);
+      });
+
+      // Apply logs sequentially
       const issuerMap = new Map<`0x${string}`, boolean>();
-      
-      addedLogs.forEach(log => {
-        if (log.args.issuer) {
-            issuerMap.set(log.args.issuer, true);
+      allLogs.forEach((log) => {
+        const address = log.args.issuer;
+        if (address) {
+          issuerMap.set(address, log.type === 'added');
         }
       });
-      
-      removedLogs.forEach(log => {
-        if (log.args.issuer) {
-            issuerMap.set(log.args.issuer, false);
-        }
-      });
-      
+
+      // Convert map to array
       const issuerList = Array.from(issuerMap.entries()).map(([address, isActive]) => ({
-        address,
+        address: address as `0x${string}`,
         isActive,
       }));
 
       return issuerList;
     } catch (error) {
-      console.error("Error fetching issuer logs:", error);
-      // Re-throw the error to be handled by the client
+      console.error('Error fetching issuer logs:', error);
       if (error instanceof Error) {
         throw new Error(`Failed to fetch issuer logs from blockchain: ${error.message}`);
       }

@@ -1,23 +1,30 @@
 'use server';
 /**
- * @fileOverview A flow for pinning certificate data to IPFS using Pinata.
+ * @fileOverview Pin certificate PDF metadata to IPFS using Pinata (PDF-only workflow).
  *
- * - pinCertificateData - A function that handles the IPFS pinning process.
- * - PinCertificateInput - The input type for the pinCertificateData function.
- * - PinCertificateOutput - The return type for the pinCertificateData function.
+ * Input:
+ *  - pdfName: string
+ *  - holderAddress: string
+ *  - timestamp: string
+ *
+ * Output:
+ *  - ipfsHash: string
+ *  - pinSize: number
+ *  - timestamp: string
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
+// --- Input Schema ---
 const PinCertificateInputSchema = z.object({
-  recipientName: z.string(),
-  recipientEmail: z.string(),
-  certificateTitle: z.string(),
-  certificateDescription: z.string(),
+  pdfName: z.string(),
+  holderAddress: z.string(),
+  timestamp: z.string(),
 });
 export type PinCertificateInput = z.infer<typeof PinCertificateInputSchema>;
 
+// --- Output Schema ---
 const PinCertificateOutputSchema = z.object({
   ipfsHash: z.string(),
   pinSize: z.number(),
@@ -25,12 +32,14 @@ const PinCertificateOutputSchema = z.object({
 });
 export type PinCertificateOutput = z.infer<typeof PinCertificateOutputSchema>;
 
+// --- Exported function ---
 export async function pinCertificateData(
   input: PinCertificateInput
 ): Promise<PinCertificateOutput> {
   return pinToIpfsFlow(input);
 }
 
+// --- Genkit Flow ---
 const pinToIpfsFlow = ai.defineFlow(
   {
     name: 'pinToIpfsFlow',
@@ -42,35 +51,26 @@ const pinToIpfsFlow = ai.defineFlow(
     const pinataSecretApiKey = process.env.PINATA_SECRET_API_KEY;
 
     if (!pinataApiKey || !pinataSecretApiKey) {
-      throw new Error(
-        'Pinata API keys are not configured in environment variables.'
-      );
+      throw new Error('Pinata API keys are not configured in environment variables.');
     }
 
+    // --- Metadata JSON ---
     const metadata = {
-      name: `${input.certificateTitle} - ${input.recipientName}`,
-      description: input.certificateDescription,
-      recipient: {
-        name: input.recipientName,
-        email: input.recipientEmail,
-      },
-      achievement: {
-        title: input.certificateTitle,
-        description: input.certificateDescription,
-      },
-      issuedOn: new Date().toISOString(),
+      pdfName: input.pdfName,
+      holderAddress: input.holderAddress,
+      issuedOn: input.timestamp,
     };
 
     const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'pinata_api_key': pinataApiKey,
-        'pinata_secret_api_key': pinataSecretApiKey,
+        pinata_api_key: pinataApiKey,
+        pinata_secret_api_key: pinataSecretApiKey,
       },
       body: JSON.stringify({
         pinataMetadata: {
-          name: `${input.certificateTitle.replace(/\s/g, '_')}.json`,
+          name: input.pdfName.replace(/\s/g, '_'), // e.g., "Team32.pdf"
         },
         pinataContent: metadata,
       }),

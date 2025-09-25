@@ -37,21 +37,33 @@
 				"inputs": [
 					{
 						"indexed": true,
+						"internalType": "uint256",
+						"name": "certId",
+						"type": "uint256"
+					},
+					{
+						"indexed": true,
 						"internalType": "address",
 						"name": "issuer",
 						"type": "address"
 					},
 					{
 						"indexed": true,
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
+						"internalType": "bytes32",
+						"name": "holderHash",
+						"type": "bytes32"
 					},
 					{
 						"indexed": false,
 						"internalType": "string",
 						"name": "metadataURI",
 						"type": "string"
+					},
+					{
+						"indexed": false,
+						"internalType": "bytes32",
+						"name": "pdfHash",
+						"type": "bytes32"
 					}
 				],
 				"name": "CertificateIssued",
@@ -62,21 +74,9 @@
 				"inputs": [
 					{
 						"indexed": true,
-						"internalType": "address",
-						"name": "issuer",
-						"type": "address"
-					},
-					{
-						"indexed": true,
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
-					},
-					{
-						"indexed": false,
-						"internalType": "string",
-						"name": "metadataURI",
-						"type": "string"
+						"internalType": "uint256",
+						"name": "certId",
+						"type": "uint256"
 					}
 				],
 				"name": "CertificateRevoked",
@@ -103,9 +103,15 @@
 						"internalType": "address",
 						"name": "issuer",
 						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "revokedAt",
+						"type": "uint256"
 					}
 				],
-				"name": "IssuerRemoved",
+				"name": "IssuerRevoked",
 				"type": "event"
 			},
 			{
@@ -131,7 +137,7 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "_issuer",
+						"name": "issuer",
 						"type": "address"
 					}
 				],
@@ -143,44 +149,51 @@
 			{
 				"inputs": [
 					{
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
+						"internalType": "address",
+						"name": "holder",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "salt",
+						"type": "uint256"
 					}
 				],
-				"name": "getCertificates",
+				"name": "computeHolderHash",
 				"outputs": [
 					{
-						"components": [
-							{
-								"internalType": "address",
-								"name": "issuer",
-								"type": "address"
-							},
-							{
-								"internalType": "string",
-								"name": "holderId",
-								"type": "string"
-							},
-							{
-								"internalType": "string",
-								"name": "metadataURI",
-								"type": "string"
-							},
-							{
-								"internalType": "uint256",
-								"name": "issuedAt",
-								"type": "uint256"
-							},
-							{
-								"internalType": "bool",
-								"name": "revoked",
-								"type": "bool"
-							}
-						],
-						"internalType": "struct CertificatePlatform.Certificate[]",
+						"internalType": "bytes32",
 						"name": "",
-						"type": "tuple[]"
+						"type": "bytes32"
+					}
+				],
+				"stateMutability": "pure",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "bytes32",
+						"name": "holderHash",
+						"type": "bytes32"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startIndex",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "endIndex",
+						"type": "uint256"
+					}
+				],
+				"name": "getHolderCertificatesPaginated",
+				"outputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "page",
+						"type": "uint256[]"
 					}
 				],
 				"stateMutability": "view",
@@ -190,11 +203,40 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "account",
+						"name": "issuer",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startIndex",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "endIndex",
+						"type": "uint256"
+					}
+				],
+				"name": "getIssuerCertificatesPaginated",
+				"outputs": [
+					{
+						"internalType": "uint256[]",
+						"name": "page",
+						"type": "uint256[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "issuer",
 						"type": "address"
 					}
 				],
-				"name": "isIssuer",
+				"name": "isIssuerActive",
 				"outputs": [
 					{
 						"internalType": "bool",
@@ -208,18 +250,34 @@
 			{
 				"inputs": [
 					{
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
+						"internalType": "address",
+						"name": "holder",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "salt",
+						"type": "uint256"
 					},
 					{
 						"internalType": "string",
 						"name": "metadataURI",
 						"type": "string"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "pdfHash",
+						"type": "bytes32"
 					}
 				],
 				"name": "issueCertificate",
-				"outputs": [],
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "certId",
+						"type": "uint256"
+					}
+				],
 				"stateMutability": "nonpayable",
 				"type": "function"
 			},
@@ -231,12 +289,12 @@
 						"type": "address"
 					}
 				],
-				"name": "issuers",
+				"name": "issuerRevokedAt",
 				"outputs": [
 					{
-						"internalType": "bool",
+						"internalType": "uint256",
 						"name": "",
-						"type": "bool"
+						"type": "uint256"
 					}
 				],
 				"stateMutability": "view",
@@ -256,19 +314,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "_issuer",
-						"type": "address"
-					}
-				],
-				"name": "removeIssuer",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
 				"inputs": [],
 				"name": "renounceOwnership",
 				"outputs": [],
@@ -278,17 +323,25 @@
 			{
 				"inputs": [
 					{
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
-					},
-					{
 						"internalType": "uint256",
-						"name": "index",
+						"name": "certId",
 						"type": "uint256"
 					}
 				],
 				"name": "revokeCertificate",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "issuer",
+						"type": "address"
+					}
+				],
+				"name": "revokeIssuer",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -309,18 +362,33 @@
 			{
 				"inputs": [
 					{
-						"internalType": "string",
-						"name": "holderId",
-						"type": "string"
+						"internalType": "uint256",
+						"name": "certId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "holder",
+						"type": "address"
 					},
 					{
 						"internalType": "uint256",
-						"name": "index",
+						"name": "salt",
 						"type": "uint256"
+					},
+					{
+						"internalType": "bytes32",
+						"name": "pdfHash",
+						"type": "bytes32"
 					}
 				],
 				"name": "verifyCertificate",
 				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "isActive",
+						"type": "bool"
+					},
 					{
 						"components": [
 							{
@@ -329,14 +397,19 @@
 								"type": "address"
 							},
 							{
-								"internalType": "string",
-								"name": "holderId",
-								"type": "string"
+								"internalType": "bytes32",
+								"name": "holderHash",
+								"type": "bytes32"
 							},
 							{
 								"internalType": "string",
 								"name": "metadataURI",
 								"type": "string"
+							},
+							{
+								"internalType": "bytes32",
+								"name": "pdfHash",
+								"type": "bytes32"
 							},
 							{
 								"internalType": "uint256",
@@ -349,8 +422,8 @@
 								"type": "bool"
 							}
 						],
-						"internalType": "struct CertificatePlatform.Certificate",
-						"name": "",
+						"internalType": "struct CertificateRegistry.Certificate",
+						"name": "cert",
 						"type": "tuple"
 					}
 				],
@@ -359,7 +432,6 @@
 			}
 		],
 		"devdoc": {
-			"details": "A contract for issuing and managing verifiable certificates with role-based access control. The contract owner can add/remove issuers. Authorized issuers can issue/revoke certificates.",
 			"errors": {
 				"OwnableInvalidOwner(address)": [
 					{
@@ -374,74 +446,16 @@
 			},
 			"kind": "dev",
 			"methods": {
-				"addIssuer(address)": {
-					"details": "Allows the owner to authorize a new issuer.",
-					"params": {
-						"_issuer": "The address of the new issuer."
-					}
-				},
-				"constructor": {
-					"details": "Sets the contract deployer as the initial owner."
-				},
-				"getCertificates(string)": {
-					"details": "Retrieves all certificates for a given holder ID.",
-					"params": {
-						"holderId": "The identifier of the holder."
-					},
-					"returns": {
-						"_0": "An array of Certificate structs."
-					}
-				},
-				"isIssuer(address)": {
-					"details": "Checks if a given address is an authorized issuer.",
-					"params": {
-						"account": "The address to check."
-					},
-					"returns": {
-						"_0": "true if the address is an issuer, false otherwise."
-					}
-				},
-				"issueCertificate(string,string)": {
-					"details": "Allows an authorized issuer to issue a new certificate.",
-					"params": {
-						"holderId": "The unique identifier for the certificate recipient.",
-						"metadataURI": "The URI pointing to the certificate's metadata."
-					}
-				},
 				"owner()": {
 					"details": "Returns the address of the current owner."
-				},
-				"removeIssuer(address)": {
-					"details": "Allows the owner to remove an issuer.",
-					"params": {
-						"_issuer": "The address of the issuer to remove."
-					}
 				},
 				"renounceOwnership()": {
 					"details": "Leaves the contract without owner. It will not be possible to call `onlyOwner` functions. Can only be called by the current owner. NOTE: Renouncing ownership will leave the contract without an owner, thereby disabling any functionality that is only available to the owner."
 				},
-				"revokeCertificate(string,uint256)": {
-					"details": "Allows an issuer to revoke a certificate they previously issued.",
-					"params": {
-						"holderId": "The identifier of the holder whose certificate is being revoked.",
-						"index": "The index of the certificate in the holder's array."
-					}
-				},
 				"transferOwnership(address)": {
 					"details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
-				},
-				"verifyCertificate(string,uint256)": {
-					"details": "Verifies a single certificate by its holder ID and index.",
-					"params": {
-						"holderId": "The identifier of the holder.",
-						"index": "The index of the certificate in the holder's array."
-					},
-					"returns": {
-						"_0": "The Certificate struct."
-					}
 				}
 			},
-			"title": "CertificatePlatform",
 			"version": 1
 		},
 		"userdoc": {
@@ -452,7 +466,7 @@
 	},
 	"settings": {
 		"compilationTarget": {
-			"contracts/1_Storage.sol": "CertificatePlatform"
+			"contracts/Cert.sol": "CertificateRegistry"
 		},
 		"evmVersion": "prague",
 		"libraries": {},
@@ -482,12 +496,12 @@
 				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
 			]
 		},
-		"contracts/1_Storage.sol": {
-			"keccak256": "0xc2c8796fff3c882b7e40cf30b07323212e64c882390fd7c402914eaa4f8e9258",
+		"contracts/Cert.sol": {
+			"keccak256": "0xa687b336983804f1516c4f5cee71b865a101f1d8a89ba4f65ef93cec564dfbc9",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://f9a6e1e483bf8f39b4ed5d6177ebbf0ef214512739c6ce9c6486077cbbba63dd",
-				"dweb:/ipfs/QmRAg9PE6B6S1B3faeo4S5gMgYGGzssCjyFEtaKrZdoHTm"
+				"bzz-raw://1c23f3ae1c799c6c0b1ad19451e8ebc5bb322e747256f06d739e7a372089bd42",
+				"dweb:/ipfs/QmUBd38MvDDR4MmGxrp9ySazbdfcZQ2xXq2SFkrVixkVVs"
 			]
 		}
 	},

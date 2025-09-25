@@ -1,232 +1,126 @@
-
 'use client';
 
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { useWriteContract } from 'wagmi';
 import { contractConfig } from '@/lib/web3';
-import { isAddress } from 'viem';
-
-import { Button } from '@/components/ui/button';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { keccak256 } from 'viem';
 import { pinCertificateData } from '@/ai/flows/pin-to-ipfs-flow';
-import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 
-const formSchema = z.object({
-  recipientName: z.string().min(2, {
-    message: 'Recipient name must be at least 2 characters.',
-  }),
-  recipientAddress: z.string().refine((val) => isAddress(val), {
-    message: 'Please enter a valid Ethereum wallet address.',
-  }),
-  recipientEmail: z.string().email({
-    message: 'Please enter a valid email address.',
-  }),
-  certificateTitle: z.string().min(5, {
-    message: 'Certificate title must be at least 5 characters.',
-  }),
-  certificateDescription: z.string().min(10, {
-    message: 'Description must be at least 10 characters.',
-  }),
-});
 
-export default function IssueCertificatePage() {
+import { Loader2 } from 'lucide-react';
+
+export default function IssueCertificatePDF() {
   const { toast } = useToast();
   const { writeContract, isPending: isContractPending } = useWriteContract();
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [holderAddress, setHolderAddress] = useState('');
   const [isPinning, setIsPinning] = useState(false);
 
   const isPending = isContractPending || isPinning;
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      recipientName: '',
-      recipientAddress: '',
-      recipientEmail: '',
-      certificateTitle: '',
-      certificateDescription: '',
-    },
-  });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) setPdfFile(e.target.files[0]);
+  };
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsPinning(true);
+  const onSubmit = async () => {
+    if (!pdfFile) {
+      toast({ variant: 'destructive', title: 'PDF Required', description: 'Please select a PDF file.' });
+      return;
+    }
+    if (!holderAddress) {
+      toast({ variant: 'destructive', title: 'Wallet Required', description: 'Please enter the recipient wallet address.' });
+      return;
+    }
+
     try {
-      // 1. Pin data to IPFS via our server flow
-      const pinataResponse = await pinCertificateData({
-        recipientName: values.recipientName,
-        recipientEmail: values.recipientEmail,
-        certificateTitle: values.certificateTitle,
-        certificateDescription: values.certificateDescription,
+      setIsPinning(true);
+
+      // --- 1. Compute PDF hash ---
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const pdfHash = keccak256(new Uint8Array(arrayBuffer));
+
+      // --- 2. Pin metadata to IPFS ---
+      const pinResponse = await pinCertificateData({
+        pdfName: pdfFile.name,
+        holderAddress,
+        timestamp: new Date().toISOString(),
       });
 
-      if (!pinataResponse.ipfsHash) {
-        throw new Error('Failed to pin data to IPFS');
-      }
+      if (!pinResponse.ipfsHash) throw new Error('Failed to pin metadata to IPFS');
+      const metadataURI = `ipfs://${pinResponse.ipfsHash}`;
 
-      const metadataURI = `ipfs://${pinataResponse.ipfsHash}`;
       toast({
-        title: 'Metadata Uploaded!',
-        description: `Successfully pinned to IPFS.`,
+        title: 'Metadata Ready',
+        description: 'Metadata pinned to IPFS successfully.',
       });
 
-      // 2. Issue certificate on the blockchain
-      const holderId = values.recipientAddress;
-      
+      // --- 3. Issue certificate on-chain ---
       writeContract({
         ...contractConfig,
         functionName: 'issueCertificate',
-        args: [holderId, metadataURI],
+        args: [holderAddress, metadataURI, pdfHash],
       }, {
         onSuccess: () => {
           toast({
-            title: 'Transaction Submitted!',
-            description: 'The certificate issuance is being processed on the blockchain.',
+            title: 'Transaction Submitted',
+            description: 'Certificate issuance is in progress on the blockchain.',
           });
-          form.reset();
+          setPdfFile(null);
+          setHolderAddress('');
         },
-        onError: (error) => {
+        onError: (error: any) => {
           toast({
             variant: 'destructive',
             title: 'Transaction Failed',
-            description: error.shortMessage || 'There was an error submitting the transaction.',
+            description: error.shortMessage || error.message || 'Unknown error',
           });
         }
       });
 
-    } catch (error) {
-      console.error(error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      toast({
-        variant: 'destructive',
-        title: 'Upload Failed',
-        description: errorMessage,
-      });
+    } catch (err) {
+      console.error(err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast({ variant: 'destructive', title: 'Error', description: message });
     } finally {
       setIsPinning(false);
     }
-  }
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Issue a New Certificate</CardTitle>
+        <CardTitle>Issue Certificate (PDF)</CardTitle>
         <CardDescription>
-          Fill in the details below. The metadata will be uploaded to IPFS via Pinata,
-          and the certificate will be issued on the Sepolia testnet.
+          Upload a PDF and enter the recipient wallet address to issue a certificate on-chain.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <div className="grid md:grid-cols-2 gap-8">
-               <FormField
-                control={form.control}
-                name="recipientName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Recipient Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Alice Johnson" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="recipientAddress"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Recipient Wallet Address (Holder ID)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="0x..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="recipientEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Recipient Email</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. alice.j@email.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Recipient Wallet Address</Label>
+          <Input
+            placeholder="0x..."
+            value={holderAddress}
+            onChange={(e) => setHolderAddress(e.target.value)}
+          />
+        </div>
 
-            <FormField
-              control={form.control}
-              name="certificateTitle"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Certificate Title</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g. Advanced Blockchain Development"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    This is the main title that will appear on the certificate.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+        <div>
+          <Label>Certificate PDF</Label>
+          <Input type="file" accept="application/pdf" onChange={handleFileChange} />
+          {pdfFile && <p className="mt-1 text-sm text-muted-foreground">{pdfFile.name}</p>}
+        </div>
 
-            <FormField
-              control={form.control}
-              name="certificateDescription"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Certificate Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="e.g. Completed a 12-week intensive course covering smart contract security, decentralized application architecture, and advanced cryptographic principles."
-                      className="resize-none"
-                      rows={4}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    A brief description of the achievement. This will be stored on IPFS.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" disabled={isPending}>
-              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isPinning ? 'Uploading to IPFS...' : isContractPending ? 'Issuing on-chain...' : 'Issue Certificate'}
-            </Button>
-          </form>
-        </Form>
+        <Button onClick={onSubmit} disabled={isPending}>
+          {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isPinning ? 'Uploading to IPFS...' : isContractPending ? 'Issuing on-chain...' : 'Issue Certificate'}
+        </Button>
       </CardContent>
     </Card>
   );

@@ -4,7 +4,8 @@ import { createWeb3Modal } from '@web3modal/wagmi/react';
 import { defaultWagmiConfig } from '@web3modal/wagmi/react/config';
 import { cookieStorage, createStorage } from 'wagmi';
 import { mainnet, sepolia } from 'wagmi/chains';
-import CertificatePlatformAbi from './contracts/CertificatePlatform.json';
+import CertificateRegistryAbi from './contracts/CertificateRegistry.json';
+
 
 // Your WalletConnect Cloud project ID
 export const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID;
@@ -47,7 +48,7 @@ createWeb3Modal({
 
 export const contractConfig = {
   address: contractAddress,
-  abi: CertificatePlatformAbi.abi,
+  abi: CertificateRegistryAbi.abi,
 } as const;
 
 
